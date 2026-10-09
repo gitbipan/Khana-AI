@@ -1,0 +1,344 @@
+"""
+PoshanAI FastAPI Backend Server
+Serves the modern Single-Page Application (SPA) and provides high-performance REST APIs.
+"""
+
+from __future__ import annotations
+import io
+import json
+import os
+from pathlib import Path
+from typing import List, Optional
+from PIL import Image
+
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from core.config import HOST, PORT, GEMMA_API_KEY
+from core.bmr_calculator import (
+    UserProfile,
+    BiologicalSex,
+    ActivityLevel,
+    HealthGoal,
+    NutritionalAssessment,
+    assess_nutrition,
+)
+from core.nutrition_db import (
+    get_nutrition_db,
+    MealItemPortion,
+    MealSummary,
+    FoodItem,
+)
+from core.vision_engine import analyze_food_image, VisionRecognitionResult
+from core.advisor_engine import (
+    evaluate_meal_against_bmr,
+    PoshanChatbot,
+    MealEvaluationVerdict,
+)
+
+BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+SAMPLES_DIR = STATIC_DIR / "sample_images"
+
+app = FastAPI(
+    title="PoshanAI API",
+    description="Open-Source Nepali Nutrition & Malnutrition Prevention Platform",
+    version="2.0.0",
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static folder
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# Initialize database & chatbot
+db = get_nutrition_db()
+chatbot = PoshanChatbot()
+
+
+# Pydantic Request Models
+class LoginRequest(BaseModel):
+    name: str = "अतिथि प्रयोगकर्ता (Guest)"
+    age_years: int = 24
+    sex: BiologicalSex = BiologicalSex.MALE
+    height_cm: float = 170.0
+    weight_kg: float = 62.0
+    activity_level: ActivityLevel = ActivityLevel.MODERATE
+    goal: HealthGoal = HealthGoal.MAINTAIN
+
+
+class ChatRequest(BaseModel):
+    message: str
+    language: str = "ne"
+    profile: Optional[UserProfile] = None
+    meal_context: Optional[dict] = None
+
+
+class SampleAnalyzeRequest(BaseModel):
+    sample_filename: str
+    custom_profile: Optional[UserProfile] = None
+
+
+class CustomMealCalculateRequest(BaseModel):
+    portions: List[MealItemPortion]
+    custom_profile: Optional[UserProfile] = None
+
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_index():
+    index_file = STATIC_DIR / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=404, detail="index.html not found")
+    return FileResponse(index_file)
+
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest):
+    """User onboarding & instant assessment computation."""
+    profile = UserProfile(
+        age_years=req.age_years,
+        sex=req.sex,
+        height_cm=req.height_cm,
+        weight_kg=req.weight_kg,
+        activity_level=req.activity_level,
+        goal=req.goal,
+    )
+    assessment = assess_nutrition(profile)
+    return {
+        "status": "success",
+        "user_name": req.name,
+        "profile": profile.model_dump(),
+        "assessment": assessment.model_dump(),
+    }
+
+
+@app.post("/api/profile/calculate")
+async def calculate_profile(profile: UserProfile):
+    """Calculate BMR, TDEE, and daily nutrient targets."""
+    assessment = assess_nutrition(profile)
+    return {
+        "status": "success",
+        "profile": profile.model_dump(),
+        "assessment": assessment.model_dump(),
+    }
+
+
+@app.get("/api/foods")
+async def list_foods(query: Optional[str] = None, tag: Optional[str] = None):
+    """Search and filter authentic Nepali foods."""
+    if query:
+        results = db.search(query)
+    elif tag and tag != "all":
+        results = db.filter_by_tag(tag)
+    else:
+        results = db.all_foods()
+    return {"status": "success", "count": len(results), "foods": [f.model_dump() for f in results]}
+
+
+@app.get("/api/samples")
+async def list_samples():
+    """List available sample dishes for quick 1-click test recognition."""
+    samples = [
+        {
+            "id": "dal_bhat",
+            "filename": "dal_bhat_tarkari.jpg",
+            "name_ne": "दाल भात तरकारी थाली",
+            "name_en": "Dal Bhat Tarkari Thali",
+            "description_ne": "परम्परागत नेपाली थाली (भात, दाल, रायोको साग, गोलभेँडाको अचार)",
+            "description_en": "Iconic Nepali staple with steamed rice, lentils, greens, and achar",
+        },
+        {
+            "id": "momo",
+            "filename": "momo_plate.jpg",
+            "name_ne": "कुखुराको म:म: (१० पिस)",
+            "name_en": "Chicken Momo Platter (10 pcs)",
+            "description_ne": "उसिनेको म:म: र तिल-गोलभेँडाको अचार (उच्च प्रोटिन खाजा)",
+            "description_en": "Steamed lean chicken dumplings with spiced dipping achar",
+        },
+        {
+            "id": "dhindo",
+            "filename": "dhindo_gundruk.jpg",
+            "name_ne": "कोदोको ढिँडो र गुन्द्रुक",
+            "name_en": "Millet Dhindo & Gundruk",
+            "description_ne": "उच्च क्याल्सियम, आइरन र फाइबर भएको रैथाने नेपाली सुपरफुड",
+            "description_en": "Indigenous superfood high in calcium, plant iron, and probiotics",
+        },
+        {
+            "id": "kwati",
+            "filename": "kwati_soup.jpg",
+            "name_ne": "क्वाँटी (९ थरी गेडागुडीको रस)",
+            "name_en": "Sprouted 9-Bean Kwati Soup",
+            "description_ne": "कुपोषण र कमजोरी हटाउने उमारेको गेडागुडीको अचुक झोल",
+            "description_en": "Sprouted multi-bean stew rich in bioavailable iron and zinc",
+        },
+        {
+            "id": "sel_roti",
+            "filename": "sel_roti.jpg",
+            "name_ne": "सेल रोटी र अचार",
+            "name_en": "Festive Sel Roti Platter",
+            "description_ne": "चाडपर्वको परम्परागत सेल रोटी र आलुको अचार",
+            "description_en": "Traditional ring rice doughnut with spiced pickle",
+        },
+    ]
+    return {"status": "success", "samples": samples}
+
+
+@app.post("/api/analyze/sample")
+async def analyze_sample(req: SampleAnalyzeRequest):
+    """Analyze a predefined authentic Nepali food sample image."""
+    filepath = SAMPLES_DIR / req.sample_filename
+    if not filepath.exists():
+        raise HTTPException(status_code=404, detail="Sample image not found")
+
+    img = Image.open(filepath)
+    recognition = analyze_food_image(
+        img,
+        image_name_hint=req.sample_filename,
+    )
+
+    # Calculate meal summary
+    portions = [
+        MealItemPortion(
+            food_id=item.food_id_guess,
+            weight_g=item.estimated_weight_g,
+            notes=item.notes,
+        )
+        for item in recognition.items
+    ]
+    meal_summary = db.calculate_meal(portions)
+
+    # Use custom profile or default
+    profile = req.custom_profile or UserProfile(
+        age_years=24,
+        sex=BiologicalSex.MALE,
+        height_cm=170.0,
+        weight_kg=62.0,
+        activity_level=ActivityLevel.MODERATE,
+        goal=HealthGoal.MAINTAIN,
+    )
+    assessment = assess_nutrition(profile)
+    evaluation = evaluate_meal_against_bmr(meal_summary, assessment)
+
+    return {
+        "status": "success",
+        "recognition": recognition.model_dump(),
+        "meal": meal_summary.model_dump(),
+        "evaluation": evaluation.model_dump(),
+        "assessment": assessment.model_dump(),
+    }
+
+
+@app.post("/api/analyze/upload")
+async def analyze_upload(
+    file: UploadFile = File(...),
+    age: int = Form(24),
+    sex: str = Form("male"),
+    height_cm: float = Form(170.0),
+    weight_kg: float = Form(62.0),
+    activity: str = Form("moderate"),
+    goal: str = Form("maintain"),
+):
+    """Upload food photo or camera snapshot for vision recognition."""
+    content = await file.read()
+    try:
+        img = Image.open(io.BytesIO(content))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+
+    recognition = analyze_food_image(
+        img,
+        image_name_hint=file.filename or "upload.jpg",
+    )
+
+    portions = [
+        MealItemPortion(
+            food_id=item.food_id_guess,
+            weight_g=item.estimated_weight_g,
+            notes=item.notes,
+        )
+        for item in recognition.items
+    ]
+    meal_summary = db.calculate_meal(portions)
+
+    sex_enum = BiologicalSex.FEMALE if sex.lower() == "female" else BiologicalSex.MALE
+    act_enum = ActivityLevel(activity) if activity in [e.value for e in ActivityLevel] else ActivityLevel.MODERATE
+    goal_enum = HealthGoal(goal) if goal in [g.value for g in HealthGoal] else HealthGoal.MAINTAIN
+
+    profile = UserProfile(
+        age_years=age,
+        sex=sex_enum,
+        height_cm=height_cm,
+        weight_kg=weight_kg,
+        activity_level=act_enum,
+        goal=goal_enum,
+    )
+    assessment = assess_nutrition(profile)
+    evaluation = evaluate_meal_against_bmr(meal_summary, assessment)
+
+    return {
+        "status": "success",
+        "recognition": recognition.model_dump(),
+        "meal": meal_summary.model_dump(),
+        "evaluation": evaluation.model_dump(),
+        "assessment": assessment.model_dump(),
+    }
+
+
+@app.post("/api/meal/recalculate")
+async def recalculate_meal(req: CustomMealCalculateRequest):
+    """Recalculate nutrition when user manually adjusts weights/portions."""
+    meal_summary = db.calculate_meal(req.portions)
+    profile = req.custom_profile or UserProfile(
+        age_years=24,
+        sex=BiologicalSex.MALE,
+        height_cm=170.0,
+        weight_kg=62.0,
+        activity_level=ActivityLevel.MODERATE,
+        goal=HealthGoal.MAINTAIN,
+    )
+    assessment = assess_nutrition(profile)
+    evaluation = evaluate_meal_against_bmr(meal_summary, assessment)
+
+    return {
+        "status": "success",
+        "meal": meal_summary.model_dump(),
+        "evaluation": evaluation.model_dump(),
+    }
+
+
+@app.post("/api/chat")
+async def chat(req: ChatRequest):
+    """Interactive nutrition chatbot endpoint."""
+    assessment = assess_nutrition(req.profile) if req.profile else None
+
+    meal_summary = None
+    if req.meal_context:
+        try:
+            meal_summary = MealSummary(**req.meal_context)
+        except Exception:
+            pass
+
+    reply = chatbot.answer_question(
+        user_message=req.message,
+        user_profile=req.profile,
+        assessment=assessment,
+        meal_context=meal_summary,
+        language=req.language,
+    )
+    return {"status": "success", "reply": reply}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    print(f"Starting PoshanAI Server at http://{HOST}:{PORT} ...")
+    uvicorn.run("server:app", host=HOST, port=PORT, reload=True)
