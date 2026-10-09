@@ -130,6 +130,10 @@ async def serve_index():
         raise HTTPException(status_code=404, detail="index.html not found")
     return FileResponse(index_file)
 
+@app.get("/health")
+async def health_check() -> dict[str, str]:
+    """Lightweight health check endpoint for deployment monitoring."""
+    return {"status": "ok", "service": "PoshanAI API"}
 
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
