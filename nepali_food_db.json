@@ -1,0 +1,13 @@
+{
+  "Bhat (White Rice)": {"calories_100g": 130, "carbs": 28, "protein": 2.7, "fat": 0.3},
+  "Dal (Lentil Soup)": {"calories_100g": 60, "carbs": 10, "protein": 4.0, "fat": 1.0},
+  "Saag (Green Leafy)": {"calories_100g": 45, "carbs": 4, "protein": 3.0, "fat": 2.0},
+  "Tarkari (Curry)": {"calories_100g": 90, "carbs": 8, "protein": 2.0, "fat": 5.0},
+  "Momo (Chicken)": {"calories_100g": 190, "carbs": 20, "protein": 11.0, "fat": 7.0},
+  "Momo (Buff)": {"calories_100g": 210, "carbs": 22, "protein": 13.0, "fat": 8.0},
+  "Momo (Veg)": {"calories_100g": 160, "carbs": 24, "protein": 5.0, "fat": 4.0},
+  "Sel Roti": {"calories_100g": 320, "carbs": 45, "protein": 4.0, "fat": 14.0},
+  "Aloo Dum": {"calories_100g": 110, "carbs": 18, "protein": 2.0, "fat": 4.0}
+}
+
+//just a layout more to fill and inaccurate data for now
