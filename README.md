@@ -1,2 +1,2 @@
 # Khana-AI
-Khana AI uses open-source computer vision to instantly analyze photos of traditional Nepali meals like Dal Bhat, Momo etc.
+Khana AI uses open-source computer vision to instantly analyze photos of traditional Nepali meals like Dal Bhat, Momo etc. The AI estimates portion sizes and calorie counts, then evaluates the meal against the user's specific age, height, and body metrics. In seconds, it generates a personalized "Plate Balance Score" along with tailored dietary feedback to show if the meal meets their daily health needs. By bringing local food context into modern AI, Khana AI solves the nutritional tracking gap mainly in Nepali society.
