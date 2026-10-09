@@ -1,0 +1,142 @@
+/* PoshanAI Custom Typography, Animations & Infographics */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800&family=Poppins:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+    --primary: #dc2626;
+    --primary-dark: #b91c1c;
+    --primary-light: #fef2f2;
+    --secondary: #ea580c;
+    --accent: #16a34a;
+    --font-main: 'Poppins', 'Noto Sans Devanagari', -apple-system, sans-serif;
+}
+
+body {
+    font-family: var(--font-main);
+    background-color: #f8fafc;
+    color: #1e293b;
+    overflow-x: hidden;
+}
+
+/* Slide-out Hamburger Drawer */
+.drawer-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.drawer-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.drawer-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    z-index: 60;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: -10px 0 25px -5px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+}
+
+.drawer-panel.open {
+    transform: translateX(0);
+}
+
+/* Glassmorphism Card */
+.glass-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(226, 232, 240, 0.8);
+    border-radius: 1rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Balanced Plate Graphic */
+.plate-container {
+    position: relative;
+    width: 280px;
+    height: 280px;
+    border-radius: 50%;
+    margin: 0 auto;
+    background: conic-gradient(
+        #16a34a 0deg 180deg,    /* 50% Vegetables & Saag (Green) */
+        #ea580c 180deg 270deg,  /* 25% Pulses/Protein (Orange) */
+        #eab308 270deg 360deg   /* 25% Whole Grains/Dhindo/Rice (Gold) */
+    );
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.15), inset 0 0 10px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plate-inner {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8px;
+}
+
+/* Typing Indicator Animation */
+.typing-dot {
+    width: 8px;
+    height: 8px;
+    background: #dc2626;
+    border-radius: 50%;
+    display: inline-block;
+    animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) { animation-delay: -0.32s; }
+.typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes typingBounce {
+    0%, 80%, 100% { transform: scale(0); }
+    40% { transform: scale(1); }
+}
+
+/* Chat bubble styling */
+.chat-bubble-user {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: white;
+    border-radius: 1.25rem 1.25rem 0.25rem 1.25rem;
+}
+
+.chat-bubble-bot {
+    background: #f1f5f9;
+    color: #1e293b;
+    border-radius: 1.25rem 1.25rem 1.25rem 0.25rem;
+    border: 1px solid #e2e8f0;
+}
+
+/* Smooth Navigation Active Tab */
+.nav-pill.active {
+    background: #dc2626;
+    color: white;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
+/* Chart Canvas Max Sizing */
+.chart-box {
+    position: relative;
+    width: 100%;
+    min-height: 240px;
+    max-height: 280px;
+}
