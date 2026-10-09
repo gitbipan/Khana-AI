@@ -1083,5 +1083,98 @@
       "malnutrition_benefits": "High plant protein, high iron, low glycemic index. Long-lasting energy and keeps blood sugar steady.",
       "malnutrition_benefits_ne": "आइरन, प्रोटिन र फाइबरको धनी। बिहानको खाजामा चना समावेश गर्दा दिनभर तागत रहन्छ।",
       "tags": ["plant_protein", "iron_rich", "high_fiber"]
-    }
+    },
+    {
+    "id": "sisnoo_soup",
+    "name_en": "Sisnoo ko Soup (Stinging Nettle Soup)",
+    "name_ne": "सिस्नोको झोल",
+    "category": "traditional_superfood",
+    "serving_unit": "1 bowl (200ml / 200g)",
+    "serving_weight_g": 200,
+    "per_100g": {
+      "calories": 45,
+      "protein_g": 3.8,
+      "carbs_g": 5.2,
+      "fat_g": 1.2,
+      "fiber_g": 3.5,
+      "iron_mg": 4.2,
+      "calcium_mg": 180,
+      "vitamin_a_mcg": 420
+    },
+    "per_serving": {
+      "calories": 90,
+      "protein_g": 7.6,
+      "carbs_g": 10.4,
+      "fat_g": 2.4,
+      "fiber_g": 7.0,
+      "iron_mg": 8.4,
+      "calcium_mg": 360,
+      "vitamin_a_mcg": 840
+    },
+    "malnutrition_benefits": "Himalayan indigenous wild superfood. Densely packed with calcium, iron, and Vitamin A. Crucial for combatting anemia and bone density deficiencies in mountain regions.",
+    "malnutrition_benefits_ne": "पहाडी र हिमाली भेगको बहुमूल्य रैथाने जडीबुटी। अत्यधिक आइरन, क्याल्सियम र भिटामिन ए पाइने हुनाले रक्तअल्पता र हड्डीको कमजोरी हटाउन अचुक।",
+    "tags": ["traditional_superfood", "iron_rich", "calcium_rich", "vitamin_a_rich", "wild_edible"]
+  },
+  {
+    "id": "kaguno_bhat",
+    "name_en": "Kaguno ko Bhaat (Foxtail Millet)",
+    "name_ne": "कागुनोको भात",
+    "category": "traditional_superfood",
+    "serving_unit": "1 medium bowl (200g cooked)",
+    "serving_weight_g": 200,
+    "per_100g": {
+      "calories": 150,
+      "protein_g": 4.8,
+      "carbs_g": 29.0,
+      "fat_g": 1.6,
+      "fiber_g": 4.2,
+      "iron_mg": 3.1,
+      "calcium_mg": 32,
+      "vitamin_a_mcg": 0
+    },
+    "per_serving": {
+      "calories": 300,
+      "protein_g": 9.6,
+      "carbs_g": 58.0,
+      "fat_g": 3.2,
+      "fiber_g": 8.4,
+      "iron_mg": 6.2,
+      "calcium_mg": 64,
+      "vitamin_a_mcg": 0
+    },
+    "malnutrition_benefits": "Ancient Karnali millet grain with low glycemic index, high iron, and high fiber. Excellent climate-resilient alternative to white rice for food security.",
+    "malnutrition_benefits_ne": "कर्णाली भेगको प्राचीन तथा रैथाने अन्न। सेतो भातको उत्कृष्ट विकल्प, जसमा प्रशस्त आइरन, प्रोटिन र फाइबर पाइन्छ।",
+    "tags": ["traditional_superfood", "iron_rich", "high_fiber", "low_gi", "climate_resilient"]
+  },
+  {
+    "id": "kinema_curry",
+    "name_en": "Kinema Curry (Fermented Soybeans)",
+    "name_ne": "किनेमाको झोल",
+    "category": "fermented",
+    "serving_unit": "1 bowl (150g)",
+    "serving_weight_g": 150,
+    "per_100g": {
+      "calories": 125,
+      "protein_g": 11.2,
+      "carbs_g": 7.5,
+      "fat_g": 5.8,
+      "fiber_g": 4.1,
+      "iron_mg": 3.8,
+      "calcium_mg": 90,
+      "vitamin_a_mcg": 12
+    },
+    "per_serving": {
+      "calories": 188,
+      "protein_g": 16.8,
+      "carbs_g": 11.2,
+      "fat_g": 8.7,
+      "fiber_g": 6.2,
+      "iron_mg": 5.7,
+      "calcium_mg": 135,
+      "vitamin_a_mcg": 18
+    },
+    "malnutrition_benefits": "Traditional Eastern Himalayan fermented soybean dish of Kirat culture. Rich in probiotics, essential amino acids, and high plant protein for gut and muscle health.",
+    "malnutrition_benefits_ne": "पूर्वी नेपालको किराँती समुदायको परम्परागत फर्मेन्टेड परिकार। उच्च प्रोटिन, प्रोबायोटिक र आन्द्रा सुधार्ने गुण हुन्छ।",
+    "tags": ["fermented", "plant_protein", "probiotic", "traditional_superfood", "high_protein"]
+  }
   ]
