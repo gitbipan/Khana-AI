@@ -47,3 +47,11 @@ def test_vision_fallback_presets():
         assert len(res.items) > 0
         assert res.dish_title_en
         assert res.dish_title_ne
+
+
+def test_fuzzy_match_mapping():
+    db = get_nutrition_db()
+    assert db.fuzzy_match("chicken_dumplings").id == "momo_chicken"
+    assert db.fuzzy_match("tomato_achar").id == "golbheda_ko_achar"
+    assert db.fuzzy_match("sprouted_bean_soup").id == "kwati_soup"
+    assert db.fuzzy_match("steamed_rice").id == "plain_steamed_rice"

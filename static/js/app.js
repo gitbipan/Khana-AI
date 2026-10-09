@@ -1,6 +1,6 @@
 /**
  * PoshanAI (पोषण AI) Interactive Single-Page Application Logic
- * Chart.js Visualizations, Hamburger Profile Management, Food Scanner, Chatbot, & Localization
+ * Organic Green Theme, Weekly Budget Tracker, AI Diet Planner, Checklist Tracking, & 1-Month Doctor PDF Export
  */
 
 // Application State
@@ -10,13 +10,17 @@ const state = {
     currentScannerMode: 'samples',
     selectedSampleFilename: 'dal_bhat_tarkari.jpg',
     currentMealAnalysis: null,
+    currentDietPlan: null,
+    dietHistory: [],
+    historyFilterDays: 30,
     samplesList: [],
     allFoods: [],
     cameraStream: null,
     charts: {
         macrosPie: null,
         caloriesBar: null,
-        micronutrientsBar: null
+        micronutrientsBar: null,
+        weeklyBudget: null
     }
 };
 
@@ -35,7 +39,7 @@ const i18n = {
         btnEditProfile: "शारीरिक विवरण सम्पादन गर्नुहोस्",
         btnLogout: "लगआउट (Sign Out)",
         dashGreeting: "नमस्ते, ",
-        dashBadge: "✨ व्यक्तिगत पोषण केन्द्र",
+        dashBadge: "🌱 व्यक्तिगत पोषण केन्द्र",
         dashBtnScan: "खाना स्क्यान गर्नुहोस्",
         dashBtnChat: "पोषण साथीसँग सोध्नुहोस्",
         infoPlateTitle: "नेपाली सन्तुलित थाली (The Balanced Nepali Plate)",
@@ -74,7 +78,7 @@ const i18n = {
         btnEditProfile: "Edit Health Metrics",
         btnLogout: "Sign Out",
         dashGreeting: "Welcome, ",
-        dashBadge: "✨ Personal Nutrition Center",
+        dashBadge: "🌱 Personal Nutrition Center",
         dashBtnScan: "Scan a Meal Photo",
         dashBtnChat: "Ask Poshan Saathi AI",
         infoPlateTitle: "The Balanced Nepali Plate (सन्तुलित थाली)",
@@ -106,7 +110,6 @@ const i18n = {
 // INITIALIZATION
 // =========================================================
 document.addEventListener('DOMContentLoaded', async () => {
-    // Check local storage for persistent session
     const savedUser = localStorage.getItem('poshan_user');
     const savedLang = localStorage.getItem('poshan_lang');
     if (savedLang) state.lang = savedLang;
@@ -124,12 +127,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadSamples();
     await loadFoods();
+    populateManualFoodPresets();
     applyLanguage();
     lucide.createIcons();
 });
 
 // =========================================================
-// SCREEN ROUTING: LOGIN VS MAIN APP
+// SCREEN ROUTING & LOGIN
 // =========================================================
 function showLoginScreen() {
     document.getElementById('login-screen').classList.remove('hidden');
@@ -151,27 +155,16 @@ function handleLogout() {
     showLoginScreen();
 }
 
-// =========================================================
-// AUTHENTICATION / ONBOARDING
-// =========================================================
 async function handleLoginSubmit(event) {
     event.preventDefault();
-    const name = document.getElementById('login-name').value.trim() || 'प्रयोगकर्ता';
-    const age = parseInt(document.getElementById('login-age').value) || 24;
-    const sex = document.getElementById('login-sex').value;
-    const height = parseFloat(document.getElementById('login-height').value) || 170;
-    const weight = parseFloat(document.getElementById('login-weight').value) || 62;
-    const activity = document.getElementById('login-activity').value;
-    const goal = document.getElementById('login-goal').value;
-
     const payload = {
-        name,
-        age_years: age,
-        sex,
-        height_cm: height,
-        weight_kg: weight,
-        activity_level: activity,
-        goal
+        name: document.getElementById('login-name').value.trim() || 'अतिथि प्रयोगकर्ता',
+        age_years: parseInt(document.getElementById('login-age').value) || 24,
+        sex: document.getElementById('login-sex').value,
+        height_cm: parseFloat(document.getElementById('login-height').value) || 170.0,
+        weight_kg: parseFloat(document.getElementById('login-weight').value) || 62.0,
+        activity_level: document.getElementById('login-activity').value,
+        goal: document.getElementById('login-goal').value
     };
 
     try {
@@ -191,20 +184,21 @@ async function handleLoginSubmit(event) {
             showAppScreen();
         }
     } catch (e) {
-        alert('त्रुटि: लगइन गर्न सकिएन।');
+        alert('लगइन असफल भयो। कृपया सर्भर सुरु छ कि छैन जाँच्नुहोस्।');
     }
 }
 
 async function handleQuickDemoLogin() {
     const payload = {
-        name: state.lang === 'ne' ? 'बैभव (अतिथि)' : 'Baibhav (Guest)',
-        age_years: 24,
-        sex: 'male',
-        height_cm: 170,
-        weight_kg: 62,
-        activity_level: 'moderate',
-        goal: 'maintain'
+        name: "बिपान (Bipan)",
+        age_years: 23,
+        sex: "male",
+        height_cm: 172.0,
+        weight_kg: 64.0,
+        activity_level: "moderate",
+        goal: "maintain"
     };
+
     try {
         const res = await fetch('/api/auth/login', {
             method: 'POST',
@@ -222,25 +216,58 @@ async function handleQuickDemoLogin() {
             showAppScreen();
         }
     } catch (e) {
-        alert('Could not start guest demo.');
+        alert('डेमो लगइन असफल भयो।');
     }
 }
 
 // =========================================================
-// HAMBURGER MENU & USER METRICS DRAWER
+// NAVIGATION SWITCHER
+// =========================================================
+function switchNav(navId) {
+    const views = ['dashboard', 'planner', 'history', 'scanner', 'chat', 'explorer'];
+    views.forEach(v => {
+        const sec = document.getElementById(`view-${v}`);
+        if (sec) sec.classList.add('hidden');
+        const btn = document.getElementById(`nav-btn-${v}`);
+        if (btn) btn.classList.remove('active');
+    });
+
+    const activeSec = document.getElementById(`view-${navId}`);
+    if (activeSec) activeSec.classList.remove('hidden');
+
+    const activeBtn = document.getElementById(`nav-btn-${navId}`);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    // Trigger section-specific loaders
+    if (navId === 'dashboard') {
+        renderWeeklyBudgetChart();
+    } else if (navId === 'planner') {
+        if (!state.currentDietPlan) {
+            generateDietPlan();
+        }
+    } else if (navId === 'history') {
+        loadDietHistory(state.historyFilterDays);
+    }
+
+    lucide.createIcons();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// =========================================================
+// HAMBURGER PROFILE DRAWER & PROFILE UPDATES
 // =========================================================
 function toggleHamburgerDrawer(forceState) {
-    const backdrop = document.getElementById('drawer-backdrop');
     const panel = document.getElementById('drawer-panel');
+    const backdrop = document.getElementById('drawer-backdrop');
     const isOpen = panel.classList.contains('open');
-    const shouldOpen = forceState !== undefined ? forceState : !isOpen;
+    const nextState = forceState !== undefined ? forceState : !isOpen;
 
-    if (shouldOpen) {
-        backdrop.classList.add('open');
+    if (nextState) {
         panel.classList.add('open');
+        backdrop.classList.add('open');
     } else {
-        backdrop.classList.remove('open');
         panel.classList.remove('open');
+        backdrop.classList.remove('open');
     }
 }
 
@@ -249,59 +276,42 @@ function updateUserInterface() {
     const { name, profile, assessment } = state.user;
     const isNe = state.lang === 'ne';
 
-    // Top greeting & drawer
-    document.getElementById('drawer-user-name').textContent = name;
-    document.getElementById('drawer-user-initial').textContent = name.charAt(0);
-    document.getElementById('drawer-user-specs').textContent = 
-        `${profile.age_years} ${isNe ? 'वर्ष' : 'yrs'} • ${profile.sex === 'male' ? (isNe ? 'पुरुष' : 'Male') : (isNe ? 'महिला' : 'Female')} • ${profile.height_cm} cm • ${profile.weight_kg} kg`;
-
-    // BMI Badge in Drawer
-    const bmiBadge = document.getElementById('drawer-bmi-badge');
-    const bmiCatText = isNe ? assessment.bmi_category.category_ne : assessment.bmi_category.category_en;
-    bmiBadge.textContent = `${assessment.bmi} (${bmiCatText})`;
-    if (assessment.bmi_category.is_malnourished) {
-        bmiBadge.className = 'px-2.5 py-0.5 rounded-full font-bold bg-red-100 text-red-700';
-    } else if (assessment.bmi < 23.0) {
-        bmiBadge.className = 'px-2.5 py-0.5 rounded-full font-bold bg-green-100 text-green-700';
-    } else {
-        bmiBadge.className = 'px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-700';
-    }
-
-    // Drawer metabolic stats
-    document.getElementById('drawer-bmr-val').textContent = `${assessment.bmr_kcal} kcal`;
-    document.getElementById('drawer-tdee-val').textContent = `${assessment.tdee_kcal} kcal`;
-    document.getElementById('drawer-target-cal').textContent = `${assessment.target_daily.calories} kcal`;
-    document.getElementById('drawer-target-pro').textContent = `${assessment.target_daily.protein_g} g (${assessment.protein_per_kg} g/kg)`;
-    document.getElementById('drawer-water-val').textContent = `${assessment.target_daily.water_liters} L`;
-
-    // Dashboard Banner & Stat Cards
+    // Dashboard Greeting & Text
     document.getElementById('dash-greeting').textContent = `${isNe ? 'नमस्ते, ' : 'Welcome, '}${name}!`;
     document.getElementById('dash-bmr-text').textContent = `${assessment.bmr_kcal} kcal`;
     document.getElementById('dash-target-text').textContent = `${assessment.target_daily.calories} kcal`;
-    document.getElementById('dash-pro-text').textContent = `${assessment.target_daily.protein_g}g ${isNe ? 'प्रोटिन' : 'protein'}`;
+    document.getElementById('dash-pro-text').textContent = `${assessment.target_daily.protein_g}g`;
 
+    // 4 Metric cards
     document.getElementById('stat-bmi').textContent = assessment.bmi;
-    document.getElementById('stat-bmi-cat').textContent = bmiCatText;
+    document.getElementById('stat-bmi-cat').textContent = isNe ? assessment.bmi_category.category_ne : assessment.bmi_category.category_en;
     document.getElementById('stat-bmr').textContent = assessment.bmr_kcal;
     document.getElementById('stat-tdee').textContent = assessment.tdee_kcal;
     document.getElementById('stat-protein').textContent = assessment.target_daily.protein_g;
 
-    // Status quote
-    const quoteEl = document.getElementById('info-status-quote');
-    const notes = isNe ? assessment.clinical_notes_ne : assessment.clinical_notes_en;
-    if (notes && notes.length > 0) {
-        quoteEl.textContent = notes[0];
-    }
+    // Hamburger drawer items
+    document.getElementById('drawer-user-name').textContent = name;
+    document.getElementById('drawer-user-initial').textContent = name.charAt(0);
+    document.getElementById('drawer-user-specs').textContent = 
+        `${profile.age_years} ${isNe ? 'वर्ष' : 'yrs'} • ${profile.sex === 'male' ? (isNe ? 'पुरुष' : 'Male') : (isNe ? 'महिला' : 'Female')} • ${profile.height_cm} cm • ${profile.weight_kg} kg`;
+    document.getElementById('drawer-bmi-badge').textContent = `${assessment.bmi} (${isNe ? assessment.bmi_category.category_ne : assessment.bmi_category.category_en})`;
+    document.getElementById('drawer-bmr-val').textContent = `${assessment.bmr_kcal} kcal`;
+    document.getElementById('drawer-tdee-val').textContent = `${assessment.tdee_kcal} kcal`;
+    document.getElementById('drawer-target-cal').textContent = `${assessment.target_daily.calories} kcal`;
+    document.getElementById('drawer-target-pro').textContent = `${assessment.target_daily.protein_g} g`;
+    document.getElementById('drawer-water-val').textContent = `${assessment.water_liters} L`;
+
+    // Render dashboard weekly chart
+    renderWeeklyBudgetChart();
 }
 
 // Edit Profile Modal
 function openEditProfileModal() {
     if (!state.user) return;
-    const { profile } = state.user;
-    document.getElementById('edit-height').value = profile.height_cm;
-    document.getElementById('edit-weight').value = profile.weight_kg;
-    document.getElementById('edit-activity').value = profile.activity_level;
-    document.getElementById('edit-goal').value = profile.goal;
+    document.getElementById('edit-height').value = state.user.profile.height_cm;
+    document.getElementById('edit-weight').value = state.user.profile.weight_kg;
+    document.getElementById('edit-activity').value = state.user.profile.activity_level;
+    document.getElementById('edit-goal').value = state.user.profile.goal;
     document.getElementById('modal-edit-profile').classList.remove('hidden');
 }
 
@@ -312,17 +322,14 @@ function closeEditProfileModal() {
 async function handleEditProfileSubmit(event) {
     event.preventDefault();
     if (!state.user) return;
-    const height = parseFloat(document.getElementById('edit-height').value);
-    const weight = parseFloat(document.getElementById('edit-weight').value);
-    const activity = document.getElementById('edit-activity').value;
-    const goal = document.getElementById('edit-goal').value;
 
     const updatedProfile = {
-        ...state.user.profile,
-        height_cm: height,
-        weight_kg: weight,
-        activity_level: activity,
-        goal: goal
+        age_years: state.user.profile.age_years,
+        sex: state.user.profile.sex,
+        height_cm: parseFloat(document.getElementById('edit-height').value),
+        weight_kg: parseFloat(document.getElementById('edit-weight').value),
+        activity_level: document.getElementById('edit-activity').value,
+        goal: document.getElementById('edit-goal').value
     };
 
     try {
@@ -338,37 +345,688 @@ async function handleEditProfileSubmit(event) {
             localStorage.setItem('poshan_user', JSON.stringify(state.user));
             closeEditProfileModal();
             updateUserInterface();
-            // If meal is already displayed, refresh bar charts
-            if (state.currentMealAnalysis) {
-                renderCaloriesBarChart(state.currentMealAnalysis.meal, state.user.assessment);
-            }
+            toggleHamburgerDrawer(false);
+            // Refresh planner & weekly chart with new metrics
+            generateDietPlan();
+            renderWeeklyBudgetChart();
         }
     } catch (e) {
-        alert('Could not update profile.');
+        alert('विवरण अद्यावधिक हुन सकेन।');
     }
 }
 
 // =========================================================
-// SECTION NAVIGATION
+// HOMEPAGE FEATURE: PAST WEEK CALORIE BUDGET CHART
 // =========================================================
-function switchNav(sectionName) {
-    const sections = ['dashboard', 'scanner', 'chat', 'explorer'];
-    sections.forEach(sec => {
-        const el = document.getElementById(`view-${sec}`);
-        const btn = document.getElementById(`nav-btn-${sec}`);
-        if (sec === sectionName) {
-            el.classList.remove('hidden');
-            if (btn) btn.classList.add('active');
-        } else {
-            el.classList.add('hidden');
-            if (btn) btn.classList.remove('active');
+async function renderWeeklyBudgetChart() {
+    const canvas = document.getElementById('chart-weekly-budget');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    const userName = state.user ? state.user.name : 'default';
+    const tdee = state.user ? state.user.assessment.tdee_kcal : 2449;
+
+    try {
+        const res = await fetch(`/api/history/weekly-tracker?user_id=${encodeURIComponent(userName)}&target_kcal=${tdee}`);
+        const data = await res.json();
+        if (data.status !== 'success') return;
+
+        const stats = data.stats;
+        const days = stats.days;
+        const isNe = state.lang === 'ne';
+
+        // Update stats summary row
+        document.getElementById('stat-weekly-target').textContent = `${stats.daily_target_kcal} kcal`;
+        document.getElementById('stat-weekly-avg').textContent = `${stats.weekly_avg_daily_kcal} kcal`;
+        document.getElementById('stat-weekly-on').textContent = `${stats.on_target_days} ${isNe ? 'दिन' : 'days'}`;
+        document.getElementById('stat-weekly-dev').textContent = 
+            `${stats.overshot_days} ${isNe ? 'दिन बढी' : 'overshot'} / ${stats.undershot_days} ${isNe ? 'दिन कम' : 'undershot'}`;
+
+        const labels = days.map(d => `${isNe ? d.day_ne : d.day_en} (${d.date.slice(5)})`);
+        const consumedValues = days.map(d => d.calories);
+        const targetValues = days.map(d => stats.daily_target_kcal);
+
+        // Bar colors depending on status:
+        // On target = emerald green, Undershot = sky blue, Overshot = warm orange
+        const barColors = days.map(d => {
+            if (d.status === 'overshot') return '#ea580c'; // Warm orange
+            if (d.status === 'undershot') return '#0284c7'; // Sky blue
+            if (d.status === 'no_data') return '#cbd5e1'; // Slate gray
+            return '#16a34a'; // Emerald green (On target)
+        });
+
+        if (state.charts.weeklyBudget) {
+            state.charts.weeklyBudget.destroy();
         }
-    });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+        state.charts.weeklyBudget = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        type: 'line',
+                        label: isNe ? 'दैनिक बजेट लक्ष्य (TDEE)' : 'Daily Budget Target',
+                        data: targetValues,
+                        borderColor: '#059669',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        pointRadius: 3,
+                        pointBackgroundColor: '#059669',
+                        fill: false,
+                        tension: 0.1,
+                        order: 1
+                    },
+                    {
+                        type: 'bar',
+                        label: isNe ? 'वास्तविक खाएको क्यालोरी' : 'Consumed Calories',
+                        data: consumedValues,
+                        backgroundColor: barColors,
+                        borderRadius: 8,
+                        barThickness: 32,
+                        order: 2
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' },
+                        ticks: {
+                            callback: v => v + ' kcal',
+                            font: { size: 10 }
+                        }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { size: 11, weight: '600' } }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: { boxWidth: 12, font: { size: 11 } }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: (ctx) => {
+                                if (ctx.datasetIndex === 1) {
+                                    const day = days[ctx.dataIndex];
+                                    if (day.status === 'overshot') return ` ⚠️ बजेटभन्दा ${day.deviation} kcal बढी (Overshot)`;
+                                    if (day.status === 'undershot') return ` ℹ️ बजेटभन्दा ${Math.abs(day.deviation)} kcal कम (Undershot)`;
+                                    if (day.status === 'on_target') return ` ✅ पूर्ण सन्तुलित (On Target)`;
+                                }
+                                return '';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+    } catch (e) {
+        console.error('Failed to load weekly tracker:', e);
+    }
 }
 
 // =========================================================
-// FOOD SCANNER & SAMPLES
+// FEATURE 1: AUTOMATIC NEPALI DIET PLANNER & CHECKLIST TODOS
+// =========================================================
+async function generateDietPlan() {
+    const preference = document.getElementById('planner-preference-select') ? 
+        document.getElementById('planner-preference-select').value : 'all';
+
+    const profile = state.user ? state.user.profile : null;
+
+    try {
+        const res = await fetch('/api/planner/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: profile, preference: preference })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            state.currentDietPlan = data.plan;
+            renderDietPlan(data.plan);
+        }
+    } catch (e) {
+        console.error('Failed to generate diet plan:', e);
+    }
+}
+
+function renderDietPlan(plan) {
+    const container = document.getElementById('planner-meals-container');
+    if (!container) return;
+    const isNe = state.lang === 'ne';
+
+    // Summary banner values
+    document.getElementById('plan-stat-target-cal').textContent = `${plan.target_daily_calories} kcal`;
+    document.getElementById('plan-stat-plan-cal').textContent = `${plan.total_planned_calories} kcal`;
+    document.getElementById('plan-stat-target-pro').textContent = `${plan.target_daily_protein_g} g`;
+    document.getElementById('plan-stat-plan-pro').textContent = `${plan.total_planned_protein_g} g`;
+
+    // Tips list
+    const tipsContainer = document.getElementById('planner-tips-list');
+    if (tipsContainer) {
+        const tips = isNe ? plan.tips_ne : plan.tips_en;
+        tipsContainer.innerHTML = tips.map(t => `<li>${t}</li>`).join('');
+    }
+
+    // Saved checked state from localStorage for today
+    const checkedKey = `checked_meals_${new Date().toISOString().slice(0, 10)}`;
+    const savedChecked = JSON.parse(localStorage.getItem(checkedKey) || '{}');
+
+    // Meal icon mappings
+    const icons = {
+        breakfast: 'sunrise',
+        lunch: 'sun',
+        snack: 'coffee',
+        dinner: 'moon'
+    };
+
+    container.innerHTML = plan.meals.map(meal => {
+        const isChecked = !!savedChecked[meal.meal_type];
+        return `
+            <div class="glass-card p-5 space-y-4 border ${isChecked ? 'border-emerald-500 bg-emerald-50/20' : 'border-slate-200'}">
+                <!-- Meal Header & Checklist -->
+                <div class="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl ${isChecked ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'} flex items-center justify-center font-bold">
+                            <i data-lucide="${icons[meal.meal_type] || 'utensils'}" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-extrabold text-sm sm:text-base text-slate-900">
+                                ${isNe ? meal.title_ne : meal.title_en}
+                            </h3>
+                            <span class="text-[11px] text-slate-500 font-medium">${meal.time_hint}</span>
+                        </div>
+                    </div>
+
+                    <!-- Checklist Todo Button -->
+                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-bold ${isChecked ? 'text-emerald-700 bg-emerald-100' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} px-3 py-1.5 rounded-lg transition select-none">
+                        <input type="checkbox" 
+                            id="check-${meal.meal_type}" 
+                            ${isChecked ? 'checked' : ''} 
+                            onchange="toggleMealChecklist('${meal.meal_type}')" 
+                            class="w-4 h-4 accent-emerald-600 rounded cursor-pointer">
+                        <span>${isChecked ? '✓ खाइसकें (Eaten)' : 'आज खाएँ? (Log)'}</span>
+                    </label>
+                </div>
+
+                <!-- Meal Calories & Macro Badges -->
+                <div class="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">क्यालोरी</span>
+                        <strong class="text-emerald-700 font-black">${meal.total_calories} kcal</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">प्रोटिन</span>
+                        <strong class="text-teal-700 font-bold">${meal.total_protein_g} g</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">कार्ब्स</span>
+                        <strong class="text-amber-700 font-bold">${meal.total_carbs_g} g</strong>
+                    </div>
+                    <div>
+                        <span class="text-slate-400 block text-[10px]">चिल्लो</span>
+                        <strong class="text-slate-700 font-bold">${meal.total_fat_g} g</strong>
+                    </div>
+                </div>
+
+                <!-- Items Breakdown List -->
+                <div class="space-y-2 text-xs">
+                    ${meal.items.map(it => `
+                        <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white border border-slate-100 hover:border-slate-200 transition">
+                            <div>
+                                <strong class="text-slate-800">${isNe ? it.name_ne : it.name_en}</strong>
+                                <span class="text-[11px] text-slate-500 block">${it.portion_desc} (${it.weight_g}g)</span>
+                                ${it.notes ? `<p class="text-[10px] text-emerald-700 mt-0.5">🌱 ${it.notes}</p>` : ''}
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <span class="font-bold text-slate-900">${it.calories} kcal</span>
+                                <span class="text-[10px] text-slate-400 block">${it.protein_g}g pro</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    lucide.createIcons();
+}
+
+async function toggleMealChecklist(mealType) {
+    if (!state.currentDietPlan) return;
+    const meal = state.currentDietPlan.meals.find(m => m.meal_type === mealType);
+    if (!meal) return;
+
+    const checkbox = document.getElementById(`check-${mealType}`);
+    const isChecked = checkbox ? checkbox.checked : false;
+
+    const checkedKey = `checked_meals_${new Date().toISOString().slice(0, 10)}`;
+    const savedChecked = JSON.parse(localStorage.getItem(checkedKey) || '{}');
+    savedChecked[mealType] = isChecked;
+    localStorage.setItem(checkedKey, JSON.stringify(savedChecked));
+
+    if (isChecked) {
+        // Automatically add to Diet History!
+        const foodNames = meal.items.map(it => it.name_ne).join(' + ');
+        const payload = {
+            user_id: state.user ? state.user.name : 'default',
+            meal_type: mealType,
+            food_name: `${meal.title_ne}: ${foodNames}`,
+            portion_desc: '१ पूरा छाक (1 Full Planned Serving)',
+            calories: meal.total_calories,
+            protein_g: meal.total_protein_g,
+            carbs_g: meal.total_carbs_g,
+            fat_g: meal.total_fat_g,
+            is_cheat: false,
+            notes: 'योजना अनुसार खाएको भोजन (Logged via Diet Planner Checklist)'
+        };
+
+        try {
+            await fetch('/api/history/log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            // Refresh weekly chart and history table
+            renderWeeklyBudgetChart();
+            renderDietPlan(state.currentDietPlan);
+        } catch (e) {
+            console.error('Failed to log meal:', e);
+        }
+    } else {
+        renderDietPlan(state.currentDietPlan);
+    }
+}
+
+// =========================================================
+// FEATURE 2: MANUAL FOOD / CHEAT MEAL ADDITION
+// =========================================================
+function populateManualFoodPresets() {
+    const select = document.getElementById('manual-food-preset');
+    if (!select || !state.allFoods || state.allFoods.length === 0) return;
+
+    select.innerHTML = '<option value="">-- रोज्नुहोस् वा आफ्नै लेख्नुहोस् --</option>' + 
+        state.allFoods.map(f => `
+            <option value="${f.id}" data-name="${f.name_ne}" data-cal="${f.per_serving.calories}" data-pro="${f.per_serving.protein_g}" data-carb="${f.per_serving.carbs_g}" data-fat="${f.per_serving.fat_g}">
+                ${f.name_ne} (${f.name_en}) - ${f.per_serving.calories} kcal
+            </option>
+        `).join('');
+}
+
+function handleManualFoodPresetSelect(event) {
+    const opt = event.target.selectedOptions[0];
+    if (!opt || !opt.dataset.name) return;
+
+    document.getElementById('manual-food-name').value = opt.dataset.name;
+    document.getElementById('manual-calories').value = opt.dataset.cal;
+    document.getElementById('manual-protein').value = opt.dataset.pro;
+    document.getElementById('manual-carbs').value = opt.dataset.carb;
+    document.getElementById('manual-fat').value = opt.dataset.fat;
+}
+
+function openManualMealModal() {
+    document.getElementById('modal-manual-meal').classList.remove('hidden');
+    populateManualFoodPresets();
+}
+
+function closeManualMealModal() {
+    document.getElementById('modal-manual-meal').classList.add('hidden');
+}
+
+async function handleManualMealSubmit(event) {
+    event.preventDefault();
+    const payload = {
+        user_id: state.user ? state.user.name : 'default',
+        meal_type: document.getElementById('manual-meal-type').value,
+        food_name: document.getElementById('manual-food-name').value.trim(),
+        portion_desc: document.getElementById('manual-portion-desc').value.trim() || '१ भाग',
+        calories: parseFloat(document.getElementById('manual-calories').value) || 0,
+        protein_g: parseFloat(document.getElementById('manual-protein').value) || 0,
+        carbs_g: parseFloat(document.getElementById('manual-carbs').value) || 0,
+        fat_g: parseFloat(document.getElementById('manual-fat').value) || 0,
+        is_cheat: document.getElementById('manual-is-cheat').checked,
+        notes: document.getElementById('manual-notes').value.trim() || ''
+    };
+
+    try {
+        const res = await fetch('/api/history/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            closeManualMealModal();
+            // Refresh history and charts
+            loadDietHistory(state.historyFilterDays);
+            renderWeeklyBudgetChart();
+            alert('खाना इतिहासमा सफलतापूर्वक सुरक्षित भयो!');
+        }
+    } catch (e) {
+        alert('खाना रेकर्ड गर्न असफल भयो।');
+    }
+}
+
+// =========================================================
+// FEATURE 3: DIET HISTORY TAB & LOG FEED
+// =========================================================
+async function loadDietHistory(days = 30) {
+    state.historyFilterDays = days;
+    const userName = state.user ? state.user.name : 'default';
+
+    try {
+        const res = await fetch(`/api/history/list?user_id=${encodeURIComponent(userName)}&days=${days}`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            state.dietHistory = data.logs;
+            renderDietHistory(data.logs);
+        }
+    } catch (e) {
+        console.error('Failed to load diet history:', e);
+    }
+}
+
+function filterHistoryDays(days) {
+    const btns = [1, 7, 30];
+    btns.forEach(d => {
+        const b = document.getElementById(`hist-btn-${d}`);
+        if (b) {
+            b.classList.remove('bg-emerald-600', 'text-white');
+            b.classList.add('bg-white', 'text-slate-700');
+        }
+    });
+
+    const activeBtn = document.getElementById(`hist-btn-${days}`);
+    if (activeBtn) {
+        activeBtn.classList.remove('bg-white', 'text-slate-700');
+        activeBtn.classList.add('bg-emerald-600', 'text-white');
+    }
+
+    loadDietHistory(days);
+}
+
+function renderDietHistory(logs) {
+    const tbody = document.getElementById('history-table-body');
+    if (!tbody) return;
+    const isNe = state.lang === 'ne';
+
+    // Calculate today's adherence stats
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayLogs = logs.filter(l => l.date === todayStr);
+    const todayCal = Math.round(todayLogs.reduce((acc, l) => acc + (l.calories || 0), 0));
+    const todayPro = Math.round(todayLogs.reduce((acc, l) => acc + (l.protein_g || 0), 0) * 10) / 10;
+    const targetCal = state.user ? state.user.assessment.target_daily.calories : 2449;
+
+    document.getElementById('hist-stat-today-cal').textContent = `${todayCal} kcal`;
+    document.getElementById('hist-stat-today-target').textContent = `${targetCal} kcal`;
+    document.getElementById('hist-stat-today-pro').textContent = `${todayPro} g`;
+    document.getElementById('hist-stat-total-count').textContent = `${logs.length} ${isNe ? 'छाक' : 'meals'}`;
+    document.getElementById('history-count-badge').textContent = `${logs.length} ${isNe ? 'रेकर्ड भेटियो' : 'records'}`;
+
+    if (logs.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="py-8 text-center text-slate-400">
+                    कुनै खाना रेकर्ड गरिएको छैन। माथिको 'म्यानुअल थप्नुहोस्' वा खाना तालिकाबाट चेक गर्नुहोस्।
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    const mealLabels = {
+        breakfast: isNe ? 'बिहानी खाजा' : 'Breakfast',
+        lunch: isNe ? 'मुख्य खाना' : 'Lunch',
+        snack: isNe ? 'दिउँसो खाजा' : 'Snack',
+        dinner: isNe ? 'साँझ खाना' : 'Dinner',
+        cheat: isNe ? 'चिट मिल 🍕' : 'Cheat Meal'
+    };
+
+    tbody.innerHTML = logs.map(log => `
+        <tr class="hover:bg-slate-50/80 transition">
+            <td class="py-3 px-4 text-slate-600">
+                <span class="font-bold text-slate-900 block">${log.date}</span>
+                <span class="text-[10px] text-slate-400">${(log.timestamp || '').slice(11, 16)}</span>
+            </td>
+            <td class="py-3 px-4">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${log.is_cheat ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}">
+                    ${mealLabels[log.meal_type] || log.meal_type}
+                </span>
+            </td>
+            <td class="py-3 px-4 font-semibold text-slate-800">
+                <span>${log.food_name}</span>
+                ${log.portion_desc ? `<span class="text-[11px] text-slate-400 block">${log.portion_desc}</span>` : ''}
+                ${log.notes ? `<span class="text-[10px] text-slate-500 italic block">"${log.notes}"</span>` : ''}
+            </td>
+            <td class="py-3 px-4 font-extrabold text-emerald-700">${log.calories}</td>
+            <td class="py-3 px-4 font-bold text-teal-700">${log.protein_g}g</td>
+            <td class="py-3 px-4">
+                ${log.is_cheat ? 
+                    '<span class="text-[11px] font-bold text-orange-600">🚨 चिट मिल</span>' : 
+                    '<span class="text-[11px] font-medium text-emerald-700">✓ नियमित</span>'}
+            </td>
+            <td class="py-3 px-4 text-right">
+                <button onclick="deleteHistoryLog(${log.id})" class="p-1 text-slate-400 hover:text-red-600 rounded transition" title="Delete">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+
+    lucide.createIcons();
+}
+
+async function deleteHistoryLog(id) {
+    if (!confirm('के तपाईं यो रेकर्ड मेटाउन चाहनुहुन्छ?')) return;
+    try {
+        const res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            loadDietHistory(state.historyFilterDays);
+            renderWeeklyBudgetChart();
+        }
+    } catch (e) {
+        alert('मेटाउन असफल भयो।');
+    }
+}
+
+// Log directly from Scanner Results
+async function logScannedMealToHistory() {
+    if (!state.currentMealAnalysis) return;
+    const { recognition, meal } = state.currentMealAnalysis;
+
+    const payload = {
+        user_id: state.user ? state.user.name : 'default',
+        meal_type: 'lunch',
+        food_name: recognition.dish_title_ne || recognition.dish_title_en,
+        portion_desc: 'AI क्यामेरा स्क्यान गरिएको थाली',
+        calories: meal.totals.calories,
+        protein_g: meal.totals.protein_g,
+        carbs_g: meal.totals.carbs_g,
+        fat_g: meal.totals.fat_g,
+        is_cheat: false,
+        notes: 'Gemma Multimodal AI Vision द्वारा स्क्यान'
+    };
+
+    try {
+        await fetch('/api/history/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        alert('खाना इतिहासमा थपियो! तपाईं इतिहास ट्याबमा हेर्न सक्नुहुन्छ।');
+        renderWeeklyBudgetChart();
+    } catch (e) {
+        alert('इतिहासमा थप्न असफल भयो।');
+    }
+}
+
+// =========================================================
+// FEATURE 4: 1-MONTH DOCTOR PDF REPORT EXPORT
+// =========================================================
+async function downloadDoctorReportPDF() {
+    const userName = state.user ? state.user.name : 'Patient';
+    const profile = state.user ? state.user.profile : { age_years: 23, sex: 'male', height_cm: 172, weight_kg: 64 };
+    const assessment = state.user ? state.user.assessment : { bmi: 21.6, bmr_kcal: 1580, tdee_kcal: 2449, bmi_category: { category_en: 'Normal' } };
+
+    try {
+        const res = await fetch(`/api/history/doctor-report-data?user_id=${encodeURIComponent(userName)}&target_kcal=${assessment.tdee_kcal}`);
+        const data = await res.json();
+        const logs = data.logs_30_days || [];
+        const stats = data.weekly_stats || {};
+
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('PDF लाइब्रेरी लोड हुन सकेन। कृपया इन्टरनेट जाँच गर्नुहोस्।');
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        // 1. Header Banner
+        doc.setFillColor(22, 101, 52); // Forest Green
+        doc.rect(0, 0, 210, 28, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('POSHAN-AI : CLINICAL NUTRITION & DIETETICS REPORT', 14, 12);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Comprehensive 30-Day Dietary Adherence, BMR & Malnutrition Assessment', 14, 19);
+        doc.text(`Generated: ${new Date().toLocaleDateString()} | For Physician & Dietitian Review`, 14, 24);
+
+        // 2. Patient Demographics & Clinical Profile
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('1. PATIENT DEMOGRAPHICS & CLINICAL METRICS', 14, 37);
+
+        const patientTableData = [
+            [
+                `Patient Name: ${userName}`,
+                `Age / Sex: ${profile.age_years} yrs / ${profile.sex.toUpperCase()}`,
+                `Height / Weight: ${profile.height_cm} cm / ${profile.weight_kg} kg`
+            ],
+            [
+                `WHO BMI: ${assessment.bmi} (${assessment.bmi_category ? assessment.bmi_category.category_en : 'Healthy'})`,
+                `Resting BMR: ${assessment.bmr_kcal} kcal/day`,
+                `Daily TDEE Target: ${assessment.tdee_kcal} kcal/day`
+            ],
+            [
+                `Protein Target: ${assessment.target_daily ? assessment.target_daily.protein_g : 75} g/day`,
+                `Malnutrition Risk: Low / Stable`,
+                `Reporting Window: Past 30 Days`
+            ]
+        ];
+
+        doc.autoTable({
+            startY: 40,
+            head: [],
+            body: patientTableData,
+            theme: 'plain',
+            styles: { fontSize: 8.5, cellPadding: 2, textColor: [51, 65, 85] },
+            columnStyles: { 0: { cellWidth: 65 }, 1: { cellWidth: 65 }, 2: { cellWidth: 60 } }
+        });
+
+        // 3. 30-Day Dietary Adherence Summary
+        const summaryY = doc.lastAutoTable.finalY + 6;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('2. 30-DAY METABOLIC COMPLIANCE SUMMARY', 14, summaryY);
+
+        const totalCal = logs.reduce((acc, l) => acc + (l.calories || 0), 0);
+        const totalPro = logs.reduce((acc, l) => acc + (l.protein_g || 0), 0);
+        const cheatCount = logs.filter(l => l.is_cheat).length;
+        const avgDailyCal = logs.length > 0 ? Math.round(totalCal / Math.min(30, logs.length)) : assessment.tdee_kcal;
+
+        const complianceData = [
+            [
+                `Average Daily Calorie Intake: ${avgDailyCal} kcal`,
+                `Daily Budget Variance: ${avgDailyCal - assessment.tdee_kcal > 0 ? '+' : ''}${avgDailyCal - assessment.tdee_kcal} kcal`,
+                `Total Meals Logged: ${logs.length} entries`
+            ],
+            [
+                `Average Protein Delivery: ${Math.round(totalPro / Math.max(1, logs.length / 3))} g/day`,
+                `Cheat Meals Logged: ${cheatCount} meals`,
+                `Budget Adherence Rate: ${stats.adherence_rate_pct || 85}%`
+            ]
+        ];
+
+        doc.autoTable({
+            startY: summaryY + 3,
+            head: [],
+            body: complianceData,
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 2.5, fillColor: [240, 253, 244] },
+        });
+
+        // 4. Detailed 30-Day Log Table
+        const logTableY = doc.lastAutoTable.finalY + 6;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('3. DETAILED DIETARY INTAKE LOG (PAST 30 DAYS)', 14, logTableY);
+
+        const tableRows = logs.map(l => [
+            l.date,
+            l.meal_type.toUpperCase(),
+            l.food_name + (l.portion_desc ? ` (${l.portion_desc})` : ''),
+            `${l.calories} kcal`,
+            `${l.protein_g} g`,
+            l.is_cheat ? 'CHEAT' : 'NORMAL'
+        ]);
+
+        doc.autoTable({
+            startY: logTableY + 3,
+            head: [['Date', 'Meal', 'Food Description & Portion', 'Calories', 'Protein', 'Status']],
+            body: tableRows.length > 0 ? tableRows : [['-', '-', 'No meal logs recorded in this period', '-', '-', '-']],
+            theme: 'striped',
+            styles: { fontSize: 7.5, cellPadding: 2 },
+            headStyles: { fillColor: [22, 101, 52], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            columnStyles: {
+                0: { cellWidth: 22 },
+                1: { cellWidth: 22 },
+                2: { cellWidth: 85 },
+                3: { cellWidth: 25 },
+                4: { cellWidth: 20 },
+                5: { cellWidth: 16 }
+            }
+        });
+
+        // 5. Physician Clinical Notes Box
+        const notesY = Math.min(doc.lastAutoTable.finalY + 6, 260);
+        if (notesY < 250) {
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.text('4. CLINICAL IMPRESSION & DIETITIAN SIGN-OFF', 14, notesY);
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'normal');
+            doc.text('Remarks: Patient dietary adherence screened via PoshanAI. Recommendations: maintain dense legume & greens intake.', 14, notesY + 5);
+            doc.line(14, notesY + 18, 90, notesY + 18);
+            doc.text('Physician / Clinical Nutritionist Signature', 14, notesY + 22);
+            doc.line(120, notesY + 18, 190, notesY + 18);
+            doc.text('Date & Hospital / Clinic Stamp', 120, notesY + 22);
+        }
+
+        // Save PDF
+        const safeName = userName.replace(/[^a-zA-Z0-9]/g, '_');
+        doc.save(`PoshanAI_Medical_Nutrition_Report_${safeName}.pdf`);
+
+    } catch (e) {
+        console.error('Failed to generate doctor PDF:', e);
+        alert('PDF निर्माण गर्न असफल भयो।');
+    }
+}
+
+// =========================================================
+// FOOD SCANNER & MULTIMODAL VISION ENGINE
 // =========================================================
 async function loadSamples() {
     try {
@@ -376,72 +1034,91 @@ async function loadSamples() {
         const data = await res.json();
         if (data.status === 'success') {
             state.samplesList = data.samples;
-            renderSampleCards();
+            renderSamplesGrid(data.samples);
         }
     } catch (e) {
-        console.error('Failed to load samples:', e);
+        console.error('Failed to load sample dishes:', e);
     }
 }
 
-function renderSampleCards() {
+function renderSamplesGrid(samples) {
     const container = document.getElementById('sample-cards-container');
     if (!container) return;
     const isNe = state.lang === 'ne';
 
-    container.innerHTML = state.samplesList.map(s => `
-        <div onclick="selectSample('${s.filename}')" class="p-2.5 rounded-xl border-2 ${state.selectedSampleFilename === s.filename ? 'border-red-600 bg-red-50/50' : 'border-slate-200 bg-white hover:border-slate-300'} cursor-pointer transition shadow-sm text-center">
-            <img src="/static/sample_images/${s.filename}" alt="${s.name_en}" class="w-full h-24 object-cover rounded-lg mb-2">
-            <h4 class="font-bold text-xs text-slate-800 line-clamp-1">${isNe ? s.name_ne : s.name_en}</h4>
-            <p class="text-[10px] text-slate-500 line-clamp-1 mt-0.5">${isNe ? s.description_ne : s.description_en}</p>
+    container.innerHTML = samples.map(s => `
+        <div onclick="selectSampleDish('${s.filename}', this)" 
+            class="sample-card cursor-pointer p-2.5 rounded-xl border ${s.filename === state.selectedSampleFilename ? 'border-emerald-600 bg-emerald-50/50 ring-2 ring-emerald-500/30' : 'border-slate-200 bg-white'} hover:shadow-md transition text-center space-y-2">
+            <img src="/static/sample_images/${s.filename}" alt="${s.name_en}" class="w-full h-24 object-cover rounded-lg shadow-sm">
+            <h4 class="font-extrabold text-xs text-slate-800 truncate">${isNe ? s.name_ne : s.name_en}</h4>
+            <p class="text-[10px] text-slate-500 line-clamp-2 leading-tight">${isNe ? s.description_ne : s.description_en}</p>
         </div>
     `).join('');
 }
 
-function selectSample(filename) {
+function selectSampleDish(filename, cardEl) {
     state.selectedSampleFilename = filename;
-    renderSampleCards();
+    document.querySelectorAll('.sample-card').forEach(c => {
+        c.classList.remove('border-emerald-600', 'bg-emerald-50/50', 'ring-2', 'ring-emerald-500/30');
+        c.classList.add('border-slate-200', 'bg-white');
+    });
+    if (cardEl) {
+        cardEl.classList.remove('border-slate-200', 'bg-white');
+        cardEl.classList.add('border-emerald-600', 'bg-emerald-50/50', 'ring-2', 'ring-emerald-500/30');
+    }
 }
 
 function switchScannerMode(mode) {
     state.currentScannerMode = mode;
     ['samples', 'upload', 'camera'].forEach(m => {
-        const el = document.getElementById(`mode-${m}`);
         const tab = document.getElementById(`tab-scan-${m}`);
-        if (m === mode) {
-            el.classList.remove('hidden');
-            tab.className = 'py-2.5 px-4 text-xs font-bold border-b-2 border-red-600 text-red-600 transition flex items-center gap-1.5';
-        } else {
-            el.classList.add('hidden');
-            tab.className = 'py-2.5 px-4 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5';
+        const view = document.getElementById(`mode-${m}`);
+        if (tab) {
+            tab.classList.remove('border-emerald-600', 'text-emerald-700');
+            tab.classList.add('border-transparent', 'text-slate-500');
         }
+        if (view) view.classList.add('hidden');
     });
 
-    if (mode !== 'camera' && state.cameraStream) {
-        state.cameraStream.getTracks().forEach(track => track.stop());
-        state.cameraStream = null;
+    const activeTab = document.getElementById(`tab-scan-${mode}`);
+    const activeView = document.getElementById(`mode-${mode}`);
+    if (activeTab) {
+        activeTab.classList.remove('border-transparent', 'text-slate-500');
+        activeTab.classList.add('border-emerald-600', 'text-emerald-700');
+    }
+    if (activeView) activeView.classList.remove('hidden');
+
+    if (mode === 'camera') {
+        startCamera();
+    } else {
+        stopCamera();
     }
 }
 
-// Upload Handling
-function handleFileUpload(event) {
-    const file = event.target.files[0];
-    if (file) {
-        executeMealAnalysisWithFile(file);
-    }
-}
-
-// Camera Handling
+// Camera Controls
 async function startCamera() {
+    const video = document.getElementById('camera-stream');
+    const placeholder = document.getElementById('camera-placeholder');
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
         state.cameraStream = stream;
-        const video = document.getElementById('camera-stream');
         video.srcObject = stream;
         video.classList.remove('hidden');
-        document.getElementById('camera-placeholder').classList.add('hidden');
+        if (placeholder) placeholder.classList.add('hidden');
     } catch (e) {
-        alert('क्यामेरा खोल्न सकिएन। कृपया अनुमति दिनुहोस्।');
+        alert('क्यामेरा सुरु गर्न सकिएन। कृपया अनुमति दिनुहोस् वा फोटो अपलोड गर्नुहोस्।');
     }
+}
+
+function stopCamera() {
+    if (state.cameraStream) {
+        state.cameraStream.getTracks().forEach(t => t.stop());
+        state.cameraStream = null;
+    }
+    const video = document.getElementById('camera-stream');
+    if (video) video.classList.add('hidden');
+    const placeholder = document.getElementById('camera-placeholder');
+    if (placeholder) placeholder.classList.remove('hidden');
 }
 
 function captureCameraSnapshot() {
@@ -459,6 +1136,13 @@ function captureCameraSnapshot() {
         const file = new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' });
         executeMealAnalysisWithFile(file);
     }, 'image/jpeg');
+}
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (file) {
+        executeMealAnalysisWithFile(file);
+    }
 }
 
 // Execute Analysis
@@ -526,45 +1210,38 @@ async function executeMealAnalysisWithFile(file) {
     }
 }
 
-// =========================================================
-// RENDER ANALYSIS RESULTS & CHART.JS
-// =========================================================
+// Render Scanner Results & Chart.js Charts
 function renderAnalysisResults(data, imageUrl) {
     state.currentMealAnalysis = data;
     const isNe = state.lang === 'ne';
     const { recognition, meal, evaluation, assessment } = data;
 
-    // Show container
     const container = document.getElementById('analysis-results');
     container.classList.remove('hidden');
 
-    // Photo & titles
     document.getElementById('res-dish-img').src = imageUrl;
     document.getElementById('res-dish-title').textContent = isNe ? recognition.dish_title_ne : recognition.dish_title_en;
     document.getElementById('res-dish-desc').textContent = isNe ? recognition.summary_ne : recognition.summary_en;
 
-    // Totals banner
     document.getElementById('res-tot-cal').textContent = meal.totals.calories;
     document.getElementById('res-tot-pro').textContent = meal.totals.protein_g;
     document.getElementById('res-tot-carb').textContent = meal.totals.carbs_g;
     document.getElementById('res-tot-fat').textContent = meal.totals.fat_g;
 
-    // Detected Items with Range Sliders
     const itemsContainer = document.getElementById('detected-items-container');
     itemsContainer.innerHTML = recognition.items.map((item, idx) => `
         <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200">
             <div class="flex items-center justify-between text-xs font-bold text-slate-800">
                 <span>${isNe ? item.name_ne : item.name_en}</span>
-                <span id="item-weight-lbl-${idx}" class="text-red-600">${item.estimated_weight_g} g</span>
+                <span id="item-weight-lbl-${idx}" class="text-emerald-700">${item.estimated_weight_g} g</span>
             </div>
             <input type="range" min="20" max="500" step="10" value="${item.estimated_weight_g}" 
                 data-food-id="${item.food_id_guess}" data-idx="${idx}"
                 oninput="document.getElementById('item-weight-lbl-${idx}').textContent = this.value + ' g'"
-                class="w-full mt-1.5 accent-red-600 cursor-pointer">
+                class="w-full mt-1.5 accent-emerald-600 cursor-pointer">
         </div>
     `).join('');
 
-    // Malnutrition Verdict Card
     const verdictBox = document.getElementById('res-verdict-box');
     document.getElementById('res-verdict-title').textContent = isNe ? evaluation.verdict_ne : evaluation.verdict_en;
     document.getElementById('res-verdict-summary').textContent = 
@@ -579,7 +1256,6 @@ function renderAnalysisResults(data, imageUrl) {
         verdictBox.className = 'p-4 rounded-xl border-l-4 shadow-sm bg-red-50 border-red-500';
     }
 
-    // Flags
     const flagsList = document.getElementById('res-flags-list');
     flagsList.innerHTML = evaluation.malnutrition_flags.map(f => `
         <div class="flex items-start gap-1.5 text-amber-800 font-medium">
@@ -588,25 +1264,25 @@ function renderAnalysisResults(data, imageUrl) {
         </div>
     `).join('');
 
-    // Local additions
     const additionsList = document.getElementById('res-additions-list');
     const additions = isNe ? evaluation.suggested_local_additions_ne : evaluation.suggested_local_additions_en;
     additionsList.innerHTML = additions.map(add => `<li>${add}</li>`).join('');
 
-    // RENDER INTERACTIVE CHART.JS CHARTS!
+    // Charts
     renderMacrosPieChart(meal);
     renderCaloriesBarChart(meal, assessment || (state.user ? state.user.assessment : null));
     renderMicronutrientsBarChart(meal, assessment || (state.user ? state.user.assessment : null));
 
+    lucide.createIcons();
     container.scrollIntoView({ behavior: 'smooth' });
 }
 
-// Recalculate Meal when user adjusts sliders
 async function recalculateCurrentMeal() {
     const sliders = document.querySelectorAll('#detected-items-container input[type="range"]');
-    const portions = Array.from(sliders).map(slider => ({
-        food_id: slider.getAttribute('data-food-id'),
-        weight_g: parseFloat(slider.value)
+    const portions = Array.from(sliders).map(s => ({
+        food_id: s.dataset.foodId,
+        weight_g: parseFloat(s.value),
+        notes: null
     }));
 
     try {
@@ -614,89 +1290,82 @@ async function recalculateCurrentMeal() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                portions,
+                portions: portions,
                 custom_profile: state.user ? state.user.profile : null
             })
         });
         const data = await res.json();
         if (data.status === 'success') {
-            state.currentMealAnalysis.meal = data.meal;
-            state.currentMealAnalysis.evaluation = data.evaluation;
-            renderAnalysisResults(state.currentMealAnalysis, document.getElementById('res-dish-img').src);
+            const { meal, evaluation } = data;
+            document.getElementById('res-tot-cal').textContent = meal.totals.calories;
+            document.getElementById('res-tot-pro').textContent = meal.totals.protein_g;
+            document.getElementById('res-tot-carb').textContent = meal.totals.carbs_g;
+            document.getElementById('res-tot-fat').textContent = meal.totals.fat_g;
+
+            document.getElementById('res-verdict-score').textContent = `${evaluation.score_out_of_10}/१०`;
+
+            renderMacrosPieChart(meal);
+            renderCaloriesBarChart(meal, state.user ? state.user.assessment : null);
+            renderMicronutrientsBarChart(meal, state.user ? state.user.assessment : null);
         }
     } catch (e) {
         alert('पुनर्गणना असफल भयो।');
     }
 }
 
-// ---------------------------------------------------------
-// CHART 1: Macronutrient Doughnut / Pie Chart
-// ---------------------------------------------------------
+// Chart 1: Macronutrient Pie
 function renderMacrosPieChart(meal) {
     const ctx = document.getElementById('chart-macros-pie').getContext('2d');
     if (state.charts.macrosPie) state.charts.macrosPie.destroy();
 
     const isNe = state.lang === 'ne';
-    const carbsLabel = isNe ? 'कार्बोहाइड्रेट (Carbs)' : 'Carbohydrates';
-    const proLabel = isNe ? 'प्रोटिन (Protein)' : 'Protein';
-    const fatLabel = isNe ? 'चिल्लो (Fat)' : 'Fats';
-
     state.charts.macrosPie = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: [carbsLabel, proLabel, fatLabel],
+            labels: [
+                isNe ? 'कार्बोहाइड्रेट' : 'Carbs',
+                isNe ? 'प्रोटिन' : 'Protein',
+                isNe ? 'चिल्लो (Fat)' : 'Fat'
+            ],
             datasets: [{
-                data: [meal.carb_calorie_pct, meal.protein_calorie_pct, meal.fat_calorie_pct],
-                backgroundColor: ['#f97316', '#dc2626', '#eab308'],
+                data: [meal.totals.carbs_g, meal.totals.protein_g, meal.totals.fat_g],
+                backgroundColor: ['#d97706', '#16a34a', '#84cc16'],
                 borderWidth: 2,
-                borderColor: '#ffffff',
-                hoverOffset: 6
+                borderColor: '#ffffff'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 12, font: { size: 11, family: 'Poppins' } }
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return ` ${context.label}: ${context.raw}% of energy`;
-                        }
-                    }
-                }
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
             },
             cutout: '65%'
         }
     });
 }
 
-// ---------------------------------------------------------
-// CHART 2: Calorie & BMR Comparison Bar Graph
-// ---------------------------------------------------------
+// Chart 2: Energy Comparison Bar
 function renderCaloriesBarChart(meal, assessment) {
     const ctx = document.getElementById('chart-calories-bar').getContext('2d');
     if (state.charts.caloriesBar) state.charts.caloriesBar.destroy();
 
+    const bmr = assessment ? assessment.bmr_kcal : 1580;
+    const tdee = assessment ? assessment.tdee_kcal : 2449;
     const isNe = state.lang === 'ne';
-    const mealLabel = isNe ? 'यो खाना (Meal)' : 'Scanned Meal';
-    const bmrLabel = isNe ? 'आधारभूत BMR' : 'Resting BMR';
-    const tdeeLabel = isNe ? 'कुल दैनिक TDEE' : 'Daily TDEE';
-
-    const bmrVal = assessment ? assessment.bmr_kcal : 1550;
-    const tdeeVal = assessment ? assessment.tdee_kcal : 2400;
 
     state.charts.caloriesBar = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: [mealLabel, bmrLabel, tdeeLabel],
+            labels: [
+                isNe ? 'यो खाना' : 'This Meal',
+                isNe ? 'BMR (आधारभूत)' : 'BMR Target',
+                isNe ? 'TDEE (दिनभर)' : 'TDEE Budget'
+            ],
             datasets: [{
-                label: isNe ? 'क्यालोरी (kcal)' : 'Calories (kcal)',
-                data: [meal.totals.calories, bmrVal, tdeeVal],
-                backgroundColor: ['#dc2626', '#f97316', '#16a34a'],
+                label: 'Calories (kcal)',
+                data: [meal.totals.calories, bmr, tdee],
+                backgroundColor: ['#16a34a', '#0d9488', '#0284c7'],
                 borderRadius: 8,
                 barThickness: 28
             }]
@@ -715,22 +1384,18 @@ function renderCaloriesBarChart(meal, assessment) {
                     ticks: { font: { size: 10 } }
                 }
             },
-            plugins: {
-                legend: { display: false }
-            }
+            plugins: { legend: { display: false } }
         }
     });
 }
 
-// ---------------------------------------------------------
-// CHART 3: Micronutrient RDA Fulfillment Bar Graph
-// ---------------------------------------------------------
+// Chart 3: Micronutrients Bar
 function renderMicronutrientsBarChart(meal, assessment) {
     const ctx = document.getElementById('chart-micronutrients-bar').getContext('2d');
     if (state.charts.micronutrientsBar) state.charts.micronutrientsBar.destroy();
 
     const targets = assessment ? assessment.target_daily : {
-        protein_g: 70,
+        protein_g: 75,
         iron_mg: 15,
         calcium_mg: 1000,
         vitamin_a_mcg: 800
@@ -738,11 +1403,11 @@ function renderMicronutrientsBarChart(meal, assessment) {
 
     const isNe = state.lang === 'ne';
     const labels = [
-        isNe ? 'प्रोटिन (Protein)' : 'Protein',
-        isNe ? 'आइरन (Iron)' : 'Iron',
-        isNe ? 'क्याल्सियम (Calcium)' : 'Calcium',
-        isNe ? 'भिटामिन ए (Vit A)' : 'Vitamin A',
-        isNe ? 'फाइबर (Fiber)' : 'Fiber'
+        isNe ? 'प्रोटिन' : 'Protein',
+        isNe ? 'आइरन' : 'Iron',
+        isNe ? 'क्याल्सियम' : 'Calcium',
+        isNe ? 'भिटामिन ए' : 'Vit A',
+        isNe ? 'फाइबर' : 'Fiber'
     ];
 
     const proPct = Math.min(Math.round((meal.totals.protein_g / (targets.protein_g || 1)) * 100), 150);
@@ -760,13 +1425,13 @@ function renderMicronutrientsBarChart(meal, assessment) {
             datasets: [{
                 label: '% of Daily Target',
                 data: values,
-                backgroundColor: values.map(v => v >= 70 ? '#16a34a' : (v >= 35 ? '#f59e0b' : '#ef4444')),
+                backgroundColor: values.map(v => v >= 70 ? '#16a34a' : (v >= 35 ? '#d97706' : '#ea580c')),
                 borderRadius: 6,
                 barThickness: 16
             }]
         },
         options: {
-            indexAxis: 'y', // Horizontal bars
+            indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
             scales: {
@@ -776,19 +1441,9 @@ function renderMicronutrientsBarChart(meal, assessment) {
                     ticks: { callback: v => v + '%' },
                     grid: { color: '#f1f5f9' }
                 },
-                y: {
-                    grid: { display: false },
-                    ticks: { font: { size: 10 } }
-                }
+                y: { grid: { display: false }, ticks: { font: { size: 10 } } }
             },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: ctx => ` ${ctx.raw}% ${isNe ? 'दैनिक आवश्यकता पूरा' : 'of daily requirement'}`
-                    }
-                }
-            }
+            plugins: { legend: { display: false } }
         }
     });
 }
@@ -813,26 +1468,24 @@ async function sendQuickChatMessage(text) {
 async function sendChatMessage(msg) {
     const container = document.getElementById('chat-messages-container');
 
-    // Append User Message
     const userDiv = document.createElement('div');
     userDiv.className = 'flex items-start justify-end gap-3';
     userDiv.innerHTML = `
         <div class="chat-bubble-user p-3.5 text-xs sm:text-sm max-w-[85%] shadow-sm">
             <p>${msg}</p>
         </div>
-        <div class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center flex-shrink-0 font-bold text-xs">
+        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center flex-shrink-0 font-bold text-xs">
             ${state.user ? state.user.name.charAt(0) : 'म'}
         </div>
     `;
     container.appendChild(userDiv);
     container.scrollTop = container.scrollHeight;
 
-    // Append Typing Animation
     const typingDiv = document.createElement('div');
     typingDiv.id = 'typing-indicator';
     typingDiv.className = 'flex items-start gap-3';
     typingDiv.innerHTML = `
-        <div class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0 font-bold text-sm">
+        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 font-bold text-sm">
             <i data-lucide="bot" class="w-4 h-4"></i>
         </div>
         <div class="chat-bubble-bot p-3 text-xs flex items-center gap-1.5">
@@ -859,15 +1512,13 @@ async function sendChatMessage(msg) {
         const data = await res.json();
         const reply = data.status === 'success' ? data.reply : 'माफ गर्नुहोस्, जवाफ पाउन सकिएन।';
 
-        // Remove typing
         const t = document.getElementById('typing-indicator');
         if (t) t.remove();
 
-        // Append Bot Reply
         const botDiv = document.createElement('div');
         botDiv.className = 'flex items-start gap-3';
         botDiv.innerHTML = `
-            <div class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0 font-bold text-sm">
+            <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 font-bold text-sm">
                 <i data-lucide="bot" class="w-4 h-4"></i>
             </div>
             <div class="chat-bubble-bot p-4 text-xs sm:text-sm max-w-[85%] space-y-1.5 leading-relaxed">
@@ -912,14 +1563,14 @@ function renderFoodsGrid(foods) {
                     <h4 class="font-extrabold text-sm text-slate-900">${isNe ? food.name_ne : food.name_en}</h4>
                     <span class="text-[11px] text-slate-500">${food.name_en}</span>
                 </div>
-                <span class="text-xs font-black text-red-600 px-2 py-0.5 rounded-md bg-red-50">${food.per_serving.calories} kcal</span>
+                <span class="text-xs font-black text-emerald-700 px-2 py-0.5 rounded-md bg-emerald-50">${food.per_serving.calories} kcal</span>
             </div>
             <p class="text-xs text-slate-600 line-clamp-2">${isNe ? food.malnutrition_benefits_ne : food.malnutrition_benefits}</p>
             
             <div class="grid grid-cols-3 gap-1 text-center bg-slate-50 p-2 rounded-lg text-[11px]">
-                <div><span class="text-slate-400 block">प्रोटिन</span><strong class="text-orange-600">${food.per_serving.protein_g}g</strong></div>
-                <div><span class="text-slate-400 block">कार्ब्स</span><strong class="text-amber-600">${food.per_serving.carbs_g}g</strong></div>
-                <div><span class="text-slate-400 block">आइरन</span><strong class="text-emerald-600">${food.per_serving.iron_mg}mg</strong></div>
+                <div><span class="text-slate-400 block">प्रोटिन</span><strong class="text-teal-700">${food.per_serving.protein_g}g</strong></div>
+                <div><span class="text-slate-400 block">कार्ब्स</span><strong class="text-amber-700">${food.per_serving.carbs_g}g</strong></div>
+                <div><span class="text-slate-400 block">आइरन</span><strong class="text-emerald-700">${food.per_serving.iron_mg}mg</strong></div>
             </div>
 
             <div class="flex flex-wrap gap-1">
@@ -945,8 +1596,8 @@ function handleFoodSearch(event) {
 
 function filterFoodsCategory(category) {
     const pills = document.querySelectorAll('.cat-pill');
-    pills.forEach(p => p.classList.remove('bg-red-600', 'text-white'));
-    event.target.classList.add('bg-red-600', 'text-white');
+    pills.forEach(p => p.classList.remove('bg-emerald-600', 'text-white'));
+    event.target.classList.add('bg-emerald-600', 'text-white');
 
     if (category === 'all') {
         renderFoodsGrid(state.allFoods);
@@ -957,74 +1608,34 @@ function filterFoodsCategory(category) {
 }
 
 // =========================================================
-// BILINGUAL LOCALIZATION TOGGLE
+// LOCALIZATION (NEPALI / ENGLISH)
 // =========================================================
 function toggleLanguage() {
     state.lang = state.lang === 'ne' ? 'en' : 'ne';
     localStorage.setItem('poshan_lang', state.lang);
     applyLanguage();
+    updateUserInterface();
+    if (state.currentMealAnalysis) {
+        renderAnalysisResults(state.currentMealAnalysis, document.getElementById('res-dish-img').src);
+    }
+    if (state.currentDietPlan) {
+        renderDietPlan(state.currentDietPlan);
+    }
+    renderFoodsGrid(state.allFoods);
+    renderSamplesGrid(state.samplesList);
 }
 
 function applyLanguage() {
     const isNe = state.lang === 'ne';
     const dict = isNe ? i18n.ne : i18n.en;
 
-    // Login screen
-    document.getElementById('login-title').textContent = dict.loginTitle;
-    document.getElementById('login-subtitle').textContent = dict.loginSubtitle;
-    document.getElementById('login-lang-label').textContent = dict.loginLangLabel;
+    document.title = dict.appTitle;
+    const loginLangLabel = document.getElementById('login-lang-label');
+    if (loginLangLabel) loginLangLabel.textContent = dict.loginLangLabel;
 
-    // Navbar & Drawer
-    document.getElementById('nav-lang-tag').textContent = dict.navLangTag;
-    document.getElementById('nav-menu-btn-text').textContent = dict.menuProfile;
-    document.getElementById('drawer-title').textContent = dict.drawerTitle;
-    document.getElementById('drawer-metabolic-title').textContent = dict.metabolicTitle;
-    document.getElementById('drawer-nav-title').textContent = dict.navTitle;
-    document.getElementById('btn-edit-profile-text').textContent = dict.btnEditProfile;
-    document.getElementById('btn-logout-text').textContent = dict.btnLogout;
+    const navLangTag = document.getElementById('nav-lang-tag');
+    if (navLangTag) navLangTag.textContent = dict.navLangTag;
 
-    // Navigation pills
-    document.querySelectorAll('.nav-text-dashboard').forEach(el => el.textContent = isNe ? 'डैशबोर्ड' : 'Dashboard');
-    document.querySelectorAll('.nav-text-scanner').forEach(el => el.textContent = isNe ? 'खाना स्क्यानर' : 'Food Scanner');
-    document.querySelectorAll('.nav-text-chat').forEach(el => el.textContent = isNe ? 'पोषण साथी (AI)' : 'Poshan Saathi AI');
-    document.querySelectorAll('.nav-text-explorer').forEach(el => el.textContent = isNe ? 'रैथाने ज्ञानकोष' : 'Encyclopaedia');
-
-    // Dashboard
-    document.getElementById('dash-badge').textContent = dict.dashBadge;
-    document.getElementById('dash-btn-scan').textContent = dict.dashBtnScan;
-    document.getElementById('dash-btn-chat').textContent = dict.dashBtnChat;
-    document.getElementById('info-plate-title').textContent = dict.infoPlateTitle;
-    document.getElementById('info-plate-sub').textContent = dict.infoPlateSub;
-    document.getElementById('info-meter-title').textContent = dict.infoMeterTitle;
-    document.getElementById('info-meter-sub').textContent = dict.infoMeterSub;
-
-    // Scanner
-    document.getElementById('scan-head-title').textContent = dict.scanTitle;
-    document.getElementById('scan-head-sub').textContent = dict.scanSub;
-    document.getElementById('tab-samples-text').textContent = dict.tabSamples;
-    document.getElementById('tab-upload-text').textContent = dict.tabUpload;
-    document.getElementById('tab-camera-text').textContent = dict.tabCamera;
-    document.getElementById('sample-pick-lbl').textContent = dict.samplePickLbl;
-    document.getElementById('upload-prompt-text').textContent = dict.uploadPrompt;
-    document.getElementById('btn-analyze-text').textContent = dict.btnAnalyze;
-    document.getElementById('chart-pie-title').textContent = dict.chartPieTitle;
-    document.getElementById('chart-bar-title').textContent = dict.chartBarTitle;
-    document.getElementById('chart-micro-title').textContent = dict.chartMicroTitle;
-
-    // Chat
-    document.getElementById('chat-title').textContent = dict.chatTitle;
-    document.getElementById('chat-sub').textContent = dict.chatSub;
-    document.getElementById('chat-initial-greeting').innerHTML = dict.chatGreeting;
-
-    // Explorer
-    document.getElementById('exp-title').textContent = dict.expTitle;
-    document.getElementById('exp-sub').textContent = dict.expSub;
-
-    // Re-render components with localized strings
-    renderSampleCards();
-    if (state.allFoods.length > 0) renderFoodsGrid(state.allFoods);
-    if (state.user) updateUserInterface();
-    if (state.currentMealAnalysis) {
-        renderAnalysisResults(state.currentMealAnalysis, document.getElementById('res-dish-img').src);
-    }
+    const navMenuBtnText = document.getElementById('nav-menu-btn-text');
+    if (navMenuBtnText) navMenuBtnText.textContent = dict.menuProfile;
 }

@@ -1,5 +1,12 @@
-streamlit
-google-genai
-pillow
-pandas
-python-dotenv
+fastapi>=0.115.0
+uvicorn>=0.30.0
+google-genai>=2.29.0
+pillow>=10.4.0
+pydantic>=2.8.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
+requests>=2.32.0
+streamlit>=1.38.0
+pandas>=2.2.0
+pytest>=8.3.0
+jinja2>=3.1.4

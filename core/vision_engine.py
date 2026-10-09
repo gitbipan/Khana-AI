@@ -144,10 +144,13 @@ def _extract_json_from_text(text: str) -> dict:
 
 
 from core.config import GEMMA_API_KEY
+from typing import Any
+
+_UNSET = object()
 
 def analyze_food_image(
     image: Image.Image,
-    api_key: Optional[str] = None,
+    api_key: Any = _UNSET,
     image_name_hint: Optional[str] = None,
 ) -> VisionRecognitionResult:
     """
@@ -155,11 +158,14 @@ def analyze_food_image(
     or falls back gracefully to pattern-matching heuristic recognition for zero-downtime demos.
     """
     # 1. Resolve API key from arguments or code config
-    key = api_key or GEMMA_API_KEY
+    if api_key is _UNSET:
+        key = GEMMA_API_KEY
+    else:
+        key = api_key
 
-    if key and key.strip():
+    if key and str(key).strip():
         try:
-            return _call_live_vision_api(image, key.strip())
+            return _call_live_vision_api(image, str(key).strip())
         except Exception as e:
             # Fall back seamlessly on any API failure so app never breaks
             print(f"[VisionEngine] API call failed: {e}. Switching to offline fallback.")
@@ -171,26 +177,44 @@ def analyze_food_image(
 def _call_live_vision_api(image: Image.Image, api_key: str) -> VisionRecognitionResult:
     """Query Google GenAI API with vision multimodal capability."""
     from google import genai
+    from core.config import FALLBACK_MODELS
 
     client = genai.Client(api_key=api_key)
 
     # Convert PIL Image to JPEG bytes
     buffer = io.BytesIO()
-    # Ensure RGB
     if image.mode in ("RGBA", "P"):
         image = image.convert("RGB")
     image.save(buffer, format="JPEG", quality=85)
     image_bytes = buffer.getvalue()
 
-    # Call Gemini / Gemma Vision endpoint
-    # Prefer gemini-2.5-flash or gemini-1.5-flash which support multimodal vision natively
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=[
-            genai.types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-            VISION_PROMPT_SYSTEM,
-        ],
-    )
+    models_to_try = [m for m in FALLBACK_MODELS]
+    if "gemini-3.5-flash" not in models_to_try:
+        models_to_try.insert(0, "gemini-3.5-flash")
+
+    last_error = None
+    response = None
+    used_model = None
+
+    for model_name in models_to_try:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[
+                    genai.types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                    VISION_PROMPT_SYSTEM,
+                ],
+            )
+            if response and response.text:
+                used_model = model_name
+                break
+        except Exception as err:
+            last_error = err
+            print(f"[VisionEngine] Model {model_name} failed: {err}. Trying next candidate...")
+            continue
+
+    if not response or not response.text:
+        raise RuntimeError(f"All vision models failed. Last error: {last_error}")
 
     raw_text = response.text or ""
     data = _extract_json_from_text(raw_text)
@@ -202,16 +226,18 @@ def _call_live_vision_api(image: Image.Image, api_key: str) -> VisionRecognition
         # Validate or fuzzy match ID against database
         matched_food = db.get_by_id(guess_id)
         if not matched_food:
-            # Try searching by name
+            matched_food = db.fuzzy_match(guess_id) or db.fuzzy_match(it.get("name_en", "")) or db.fuzzy_match(it.get("name_ne", ""))
+        if not matched_food:
             search_hits = db.search(it.get("name_en", "")) or db.search(it.get("name_ne", ""))
             if search_hits:
                 matched_food = search_hits[0]
-                guess_id = matched_food.id
+        if matched_food:
+            guess_id = matched_food.id
 
         items.append(
             DetectedItem(
-                food_id_guess=guess_id or "dal_bhat_tarkari",
-                name_en=it.get("name_en") or (matched_food.name_en if matched_food else "Nepali Dish"),
+                food_id_guess=guess_id or "plain_steamed_rice",
+                name_en=it.get("name_en") or (matched_food.name_en if matched_food else "Nepali Food Item"),
                 name_ne=it.get("name_ne") or (matched_food.name_ne if matched_food else "नेपाली परिकार"),
                 estimated_weight_g=float(it.get("estimated_weight_g", 150)),
                 confidence=float(it.get("confidence", 0.9)),
@@ -219,14 +245,26 @@ def _call_live_vision_api(image: Image.Image, api_key: str) -> VisionRecognition
             )
         )
 
+    if not items:
+        # Fallback to general item if JSON was empty
+        items.append(
+            DetectedItem(
+                food_id_guess="dal_bhat_tarkari",
+                name_en="Traditional Nepali Meal",
+                name_ne="नेपाली खाना",
+                estimated_weight_g=350,
+                confidence=0.85,
+            )
+        )
+
     return VisionRecognitionResult(
-        source="live_api",
-        dish_title_en=data.get("dish_title_en", "Recognized Nepali Meal"),
+        source=f"live_api ({used_model})",
+        dish_title_en=data.get("dish_title_en", "Recognized Food Plate"),
         dish_title_ne=data.get("dish_title_ne", "पहिचान गरिएको नेपाली खाना"),
-        summary_en=data.get("summary_en", "Analyzed via Gemma / Gemini Multimodal Vision."),
-        summary_ne=data.get("summary_ne", "Gemma / Gemini मल्टिमोडल भिजनद्वारा विश्लेषण गरिएको।"),
+        summary_en=data.get("summary_en", "Analyzed live via Multimodal Vision AI."),
+        summary_ne=data.get("summary_ne", "मल्टिमोडल AI भिजनद्वारा प्रत्यक्ष पहिचान गरिएको।"),
         items=items,
-        confidence_overall=0.95,
+        confidence_overall=0.96,
     )
 
 

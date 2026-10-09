@@ -112,6 +112,47 @@ class NutritionDatabase:
         t = tag.strip().lower()
         return [f for f in self._foods.values() if any(t == item_tag.lower() for item_tag in f.tags)]
 
+    def fuzzy_match(self, query: str) -> Optional[FoodItem]:
+        """Fuzzy match food names, ingredients, or IDs to nearest authentic Nepali food."""
+        import re
+        q = (query or "").lower().strip()
+        if not q:
+            return None
+        if q in self._foods:
+            return self._foods[q]
+
+        token_map = [
+            (["momo", "dumpling"], "momo_chicken"),
+            (["rice", "bhat", "steamed"], "plain_steamed_rice"),
+            (["dhindo", "millet", "kodo"], "kodo_ko_dhindo"),
+            (["kwati", "sprout", "bean"], "kwati_soup"),
+            (["gundruk", "ferment"], "gundruk_bhatmas_soup"),
+            (["bhatmas", "soybean"], "bhatmas_sadeko"),
+            (["achar", "pickle", "chutney", "tomato", "golbheda", "sesame"], "golbheda_ko_achar"),
+            (["dal", "lentil", "musuro"], "musuro_ko_dal"),
+            (["saag", "green", "spinach", "mustard", "rayo"], "rayo_ko_saag"),
+            (["sel", "roti", "doughnut"], "sel_roti"),
+            (["egg", "anda"], "boiled_egg"),
+            (["chiura", "beaten"], "chiura_beaten_rice"),
+            (["jaulo", "khichdi"], "jaulo_porridge"),
+            (["sattu", "gram"], "sattu_flour"),
+        ]
+        for tokens, fid in token_map:
+            if any(t in q for t in tokens) and fid in self._foods:
+                return self._foods[fid]
+
+        hits = self.search(q)
+        if hits:
+            return hits[0]
+
+        words = [w for w in re.split(r"\W+", q) if len(w) > 2]
+        for w in words:
+            hits = self.search(w)
+            if hits:
+                return hits[0]
+
+        return None
+
     def calculate_meal(self, portions: List[MealItemPortion]) -> MealSummary:
         """Aggregate total nutrients for a multi-item Nepali meal/thali."""
         tot_cal = 0.0
@@ -128,9 +169,11 @@ class NutritionDatabase:
         highlights_ne = []
 
         for p in portions:
-            food = self.get_by_id(p.food_id)
+            food = self.get_by_id(p.food_id) or self.fuzzy_match(p.food_id)
+            if not food and p.notes:
+                food = self.fuzzy_match(p.notes)
             if not food:
-                continue
+                food = self.get_by_id("plain_steamed_rice") or list(self._foods.values())[0]
 
             n = food.calculate_for_weight(p.weight_g)
             tot_cal += n.calories

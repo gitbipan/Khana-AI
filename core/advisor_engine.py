@@ -5,7 +5,7 @@ Evaluates meals against BMR/TDEE targets and provides actionable bilingual guida
 
 from __future__ import annotations
 import os
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import BaseModel, Field
 
 from core.bmr_calculator import UserProfile, NutritionalAssessment, assess_nutrition
@@ -60,13 +60,13 @@ def evaluate_meal_against_bmr(
     additions_en: List[str] = []
     additions_ne: List[str] = []
 
-    # Scoring baseline
-    score = 8.0
+    # Nuanced, dynamic scoring based on clinical nutrition metrics
+    score = 7.5
 
-    # 1. Carbohydrate Imbalance Check (Classic Nepali "Bhat-heavy" trap)
-    # If carbs provide > 70% of energy
+    # 1. Carbohydrate Proportion Check (Classic Nepali "Bhat-heavy" trap)
     if meal.carb_calorie_pct > 70.0:
-        score -= 2.0
+        penalty = round(min(2.5, 1.0 + (meal.carb_calorie_pct - 70.0) * 0.08), 1)
+        score -= penalty
         flags.append(
             MalnutritionFlag(
                 code="high_carb_ratio",
@@ -81,15 +81,19 @@ def evaluate_meal_against_bmr(
         advice_ne.append(
             "सेतो भातको भाग २५-३०% घटाउनुहोस् र त्यसको साटो बाक्लो दाल वा हरियो सागसब्जी थप्नुहोस्।"
         )
+    elif 45.0 <= meal.carb_calorie_pct <= 62.0:
+        score += 1.0
+        positives_en.append("Carbohydrate to protein ratio is clinically balanced.")
+        positives_ne.append("कार्बोहाइड्रेट र प्रोटिनको सन्तुलन अत्यन्त राम्रो छ।")
     else:
-        positives_en.append("Carbohydrate to protein balance is within healthy functional limits.")
-        positives_ne.append("कार्बोहाइड्रेट र प्रोटिनको सन्तुलन उपयुक्त छ।")
+        score += 0.2
+        positives_en.append("Carbohydrate energy within functional limits.")
+        positives_ne.append("कार्बोहाइड्रेटको मात्रा सामान्य छ।")
 
-    # 2. Protein Deficiency Check (Critical for stunting / muscle wasting prevention)
-    # A single major meal should ideally provide at least 25-35% of daily protein target
+    # 2. Protein Adequacy Check
     expected_meal_protein = target_pro * 0.30
-    if meal_pro < 12.0 or pro_pct_target < 20.0:
-        score -= 2.5
+    if meal_pro < 10.0 or pro_pct_target < 18.0:
+        score -= 2.2
         flags.append(
             MalnutritionFlag(
                 code="low_protein",
@@ -110,17 +114,22 @@ def evaluate_meal_against_bmr(
         additions_ne.append("१ वटा उसिनेको अण्डा (+७.२ ग्राम प्रोटिन, करिब १५ रुपैयाँ)")
         additions_ne.append("उमारेको क्वाँटीको रस (+१५.८ ग्राम प्रोटिन, जिंकसहित)")
         additions_ne.append("भुटेको भटमास खाजा (+२२.५ ग्राम प्रोटिन/१०० ग्राम)")
-    else:
-        score += 1.0
+    elif meal_pro >= expected_meal_protein:
+        score += 1.2
         positives_en.append(f"Solid protein delivery ({meal_pro}g), achieving {pro_pct_target}% of daily target.")
         positives_ne.append(f"पर्याप्त प्रोटिन ({meal_pro} ग्राम), दैनिक आवश्यकताको {pro_pct_target}% पूरा भयो।")
+    else:
+        score += 0.4
+        positives_en.append(f"Moderate protein delivery ({meal_pro}g).")
+        positives_ne.append(f"मध्यम प्रोटिन मात्रा ({meal_pro} ग्राम)।")
 
-    # 3. Iron & Anemia Screening (Key public health challenge in Nepal)
-    if meal_iron >= 4.0:
-        score += 0.5
+    # 3. Iron & Anemia Screening
+    if meal_iron >= 4.5:
+        score += 0.6
         positives_en.append(f"Excellent iron supply ({meal_iron}mg) - helps protect against nutritional anemia.")
         positives_ne.append(f"राम्रो आइरन मात्रा ({meal_iron} मि.ग्रा.) - रक्तअल्पता (रगतको कमी) बाट बचाउँछ।")
-    else:
+    elif meal_iron < 2.0:
+        score -= 0.6
         flags.append(
             MalnutritionFlag(
                 code="low_iron",
@@ -139,8 +148,8 @@ def evaluate_meal_against_bmr(
         additions_ne.append("ताजा रायो वा पालुङ्गोको साग")
 
     # 4. Caloric Proportion Check
-    if cal_pct_tdee > 60.0:
-        score -= 1.0
+    if cal_pct_tdee > 55.0:
+        score -= 1.2
         flags.append(
             MalnutritionFlag(
                 code="heavy_meal",
@@ -150,6 +159,7 @@ def evaluate_meal_against_bmr(
             )
         )
     elif cal_pct_tdee < 15.0:
+        score -= 0.6
         flags.append(
             MalnutritionFlag(
                 code="insufficient_calories",
@@ -158,10 +168,12 @@ def evaluate_meal_against_bmr(
                 message_ne=f"क्यालोरी धेरै कम छ ({meal_cal} क्यालोरी = TDEE को {cal_pct_tdee}%)। मुख्य खाना भए थप ऊर्जा आवश्यक छ।",
             )
         )
+    elif 25.0 <= cal_pct_tdee <= 42.0:
+        score += 0.5
 
     # 5. Traditional Superfood Recognition Bonus
     if any("traditional_superfood" in item.get("notes", "") or "malnutrition_superfood" in item.get("notes", "") for item in meal.items):
-        score += 1.0
+        score += 0.8
         positives_en.append("Contains authentic indigenous superfoods (Millet Dhindo / Kwati / Fermented Gundruk).")
         positives_ne.append("नेपाली रैथाने सुपरफुड (कोदोको ढिँडो / क्वाँटी / गुन्द्रुक) समावेश छ।")
 
@@ -208,15 +220,55 @@ Your guiding principles:
 5. Tone: Respectful, encouraging, culturally warm ("नमस्ते! तपाईंको स्वास्थ्य नै हाम्रो प्राथमिकता हो").
 """
 
+# Diet Planner Models
+class MealPlanItem(BaseModel):
+    item_id: str
+    name_ne: str
+    name_en: str
+    portion_desc: str
+    weight_g: float
+    calories: int
+    protein_g: float
+    carbs_g: float
+    fat_g: float
+    notes: Optional[str] = None
 
-from core.config import GEMMA_API_KEY, CHAT_MODEL
+class PlannedMeal(BaseModel):
+    meal_type: str  # "breakfast", "lunch", "snack", "dinner"
+    title_ne: str
+    title_en: str
+    time_hint: str
+    target_calories: int
+    items: List[MealPlanItem]
+    total_calories: int
+    total_protein_g: float
+    total_carbs_g: float
+    total_fat_g: float
 
+class DailyDietPlan(BaseModel):
+    plan_date: str
+    target_daily_calories: int
+    target_daily_protein_g: float
+    meals: List[PlannedMeal]
+    total_planned_calories: int
+    total_planned_protein_g: float
+    health_goal: str
+    tips_ne: List[str]
+    tips_en: List[str]
+
+
+from core.config import GEMMA_API_KEY, CHAT_MODEL, FALLBACK_MODELS
+
+_UNSET = object()
 
 class PoshanChatbot:
     """Conversational nutritional advisor with live LLM and comprehensive clinical domain knowledge."""
 
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or GEMMA_API_KEY
+    def __init__(self, api_key: Any = _UNSET):
+        if api_key is _UNSET:
+            self.api_key = GEMMA_API_KEY
+        else:
+            self.api_key = api_key
 
     def answer_question(
         self,
@@ -227,7 +279,7 @@ class PoshanChatbot:
         language: str = "ne",  # "ne" or "en"
     ) -> str:
         """Answer user questions via live Gemini/Gemma API or intelligent clinical fallback."""
-        if self.api_key and self.api_key.strip():
+        if self.api_key and str(self.api_key).strip():
             try:
                 return self._call_live_llm(user_message, user_profile, assessment, meal_context, language)
             except Exception as e:
@@ -245,7 +297,7 @@ class PoshanChatbot:
     ) -> str:
         from google import genai
 
-        client = genai.Client(api_key=self.api_key.strip())
+        client = genai.Client(api_key=str(self.api_key).strip())
 
         context_prompt = CHATBOT_SYSTEM_PROMPT + "\n\n"
         if profile and assessment:
@@ -265,11 +317,23 @@ class PoshanChatbot:
         context_prompt += f"Preferred output language: {'Nepali (नेपाली - देवनागरी)' if language == 'ne' else 'English'}.\n"
         context_prompt += f"User Question: {user_message}\n"
 
-        response = client.models.generate_content(
-            model=CHAT_MODEL,
-            contents=context_prompt,
-        )
-        return response.text or ("माफ गर्नुहोस्, जवाफ प्राप्त हुन सकेन।" if language == "ne" else "Apologies, could not generate a response.")
+        models_to_try = [m for m in FALLBACK_MODELS]
+        if "gemini-3.5-flash" not in models_to_try:
+            models_to_try.insert(0, "gemini-3.5-flash")
+
+        for m_name in models_to_try:
+            try:
+                response = client.models.generate_content(
+                    model=m_name,
+                    contents=context_prompt,
+                )
+                if response and response.text:
+                    return response.text
+            except Exception as err:
+                print(f"[PoshanChatbot] Model {m_name} failed: {err}")
+                continue
+
+        raise RuntimeError("Live LLM generation failed across all models")
 
     def _clinical_offline_response(
         self,
@@ -490,4 +554,213 @@ class PoshanChatbot:
                 f"• **1/4 Plate:** Whole grains (Rice, Millet Dhindo, or Roti).\n\n"
                 f"Would you like advice tailored to your BMR target or a specific food item?"
             )
+
+
+def generate_nepali_diet_plan(
+    profile: UserProfile,
+    assessment: NutritionalAssessment,
+    preference: str = "all",  # "all", "veg", "budget"
+    api_key: Optional[str] = None,
+) -> DailyDietPlan:
+    """
+    Generates an automated, culturally authentic Nepali Daily Meal Plan (Breakfast, Lunch, Snack, Dinner)
+    calculated to match the user's specific BMR/TDEE caloric target and protein RDA.
+    """
+    from datetime import date
+    target_cal = int(round(assessment.target_daily.calories))
+    target_pro = round(float(assessment.target_daily.protein_g), 1)
+
+    # Caloric distribution:
+    bf_cal = int(round(target_cal * 0.22))
+    lunch_cal = int(round(target_cal * 0.38))
+    snack_cal = int(round(target_cal * 0.15))
+    din_cal = int(round(target_cal - (bf_cal + lunch_cal + snack_cal)))
+
+    # 1. Breakfast options based on preference and goal
+    is_veg = preference == "veg"
+    is_malnourished = assessment.bmi_category.is_malnourished
+
+    bf_items: List[MealPlanItem] = []
+    if is_malnourished:
+        bf_items.extend([
+            MealPlanItem(item_id="sattu_drink", name_ne="सातु र दूध (Sattu Drink)", name_en="Roasted Gram Sattu in Warm Milk", portion_desc="१ ठूलो गिलास", weight_g=250, calories=280, protein_g=14.0, carbs_g=38.0, fat_g=6.0, notes="High-density indigenous recovery drink"),
+            MealPlanItem(item_id="boiled_egg", name_ne="उसिनेको अण्डा (२ वटा)" if not is_veg else "भिजाएको बदाम र काजु", name_en="2 Boiled Eggs" if not is_veg else "Soaked Almonds & Nuts", portion_desc="२ वटा" if not is_veg else "३० ग्राम", weight_g=100 if not is_veg else 30, calories=150, protein_g=13.0 if not is_veg else 6.0, carbs_g=1.0 if not is_veg else 6.0, fat_g=10.0 if not is_veg else 14.0, notes="Rapid bioavailable protein"),
+        ])
+    else:
+        bf_items.extend([
+            MealPlanItem(item_id="chiura_chana", name_ne="चिउरा र कालो चनाको तरकारी", name_en="Beaten Rice & Black Chickpea Tarkari", portion_desc="१ प्लेट", weight_g=200, calories=round(bf_cal * 0.65), protein_g=10.5, carbs_g=52.0, fat_g=4.5, notes="Sustained energy and iron"),
+            MealPlanItem(item_id="boiled_egg", name_ne="उसिनेको अण्डा" if not is_veg else "ताजा मोही (Mohi)", name_en="1 Boiled Egg" if not is_veg else "Fresh Buttermilk (Mohi)", portion_desc="१ वटा" if not is_veg else "१ गिलास", weight_g=55 if not is_veg else 200, calories=round(bf_cal * 0.35), protein_g=7.2 if not is_veg else 6.5, carbs_g=0.6 if not is_veg else 9.0, fat_g=5.0 if not is_veg else 3.5, notes="Pure protein booster"),
+        ])
+
+    # 2. Lunch: The Balanced Nepali Platter (Millet Dhindo or Dal Bhat)
+    lunch_items: List[MealPlanItem] = [
+        MealPlanItem(
+            item_id="kodo_ko_dhindo" if profile.goal.value != "weight_loss" else "plain_steamed_rice",
+            name_ne="कोदोको ढिँडो (वा उसिनेको भात)" if profile.goal.value != "weight_loss" else "उसिनेको सेतो भात (सीमित भाग)",
+            name_en="Millet Dhindo" if profile.goal.value != "weight_loss" else "Steamed Rice (Controlled)",
+            portion_desc="२५० ग्राम",
+            weight_g=240,
+            calories=round(lunch_cal * 0.45),
+            protein_g=7.5,
+            carbs_g=68.0,
+            fat_g=1.8,
+            notes="Calcium-rich indigenous staple"
+        ),
+        MealPlanItem(
+            item_id="kwati_soup" if is_malnourished else "musuro_ko_dal",
+            name_ne="उमारेको ९-गेडागुडी क्वाँटीको रस" if is_malnourished else "मुसुरोको बाक्लो दाल",
+            name_en="Sprouted Kwati 9-Bean Soup" if is_malnourished else "Thick Red Lentil Dal",
+            portion_desc="१ कचौरा",
+            weight_g=160,
+            calories=round(lunch_cal * 0.25),
+            protein_g=12.5,
+            carbs_g=26.0,
+            fat_g=2.2,
+            notes="Rich in zinc, amino acids and plant iron"
+        ),
+        MealPlanItem(
+            item_id="rayo_ko_saag",
+            name_ne="रायोको हरियो साग",
+            name_en="Fresh Mustard Greens (Rayo Saag)",
+            portion_desc="१ कचौरा",
+            weight_g=100,
+            calories=55,
+            protein_g=3.2,
+            carbs_g=4.8,
+            fat_g=1.5,
+            notes="Vitamin A, C and anti-anemia iron"
+        ),
+        MealPlanItem(
+            item_id="chicken_curry" if not is_veg else "tofu_paneer_tarkari",
+            name_ne="कुखुराको मासुको झोल" if not is_veg else "पनीर / तोफु तरकारी",
+            name_en="Nepali Chicken Curry" if not is_veg else "Paneer & Pea Curry",
+            portion_desc="१०० ग्राम",
+            weight_g=110,
+            calories=round(lunch_cal * 0.22),
+            protein_g=18.0 if not is_veg else 14.0,
+            carbs_g=3.5 if not is_veg else 6.0,
+            fat_g=8.0 if not is_veg else 10.0,
+            notes="Core protein building block"
+        ),
+    ]
+
+    # 3. Afternoon Snack
+    snack_items: List[MealPlanItem] = [
+        MealPlanItem(
+            item_id="bhatmas_sadeko",
+            name_ne="भुटेको भटमास र मकै (Bhatmas & Makai)",
+            name_en="Roasted Soybeans & Roasted Corn",
+            portion_desc="आधा कचौरा",
+            weight_g=60,
+            calories=round(snack_cal * 0.75),
+            protein_g=14.0,
+            carbs_g=18.0,
+            fat_g=6.5,
+            notes="Highest plant protein per rupee in Nepal"
+        ),
+        MealPlanItem(
+            item_id="seasonal_fruit",
+            name_ne="सिजनल फलफूल (स्याउ / केरा)",
+            name_en="Seasonal Fruit (Apple or Banana)",
+            portion_desc="१ वटा",
+            weight_g=120,
+            calories=round(snack_cal * 0.25),
+            protein_g=1.0,
+            carbs_g=22.0,
+            fat_g=0.3,
+            notes="Dietary fiber and electrolytes"
+        ),
+    ]
+
+    # 4. Dinner
+    din_items: List[MealPlanItem] = [
+        MealPlanItem(
+            item_id="phapar_ko_roti",
+            name_ne="फापरको रोटी (वा गहुँको रोटी)",
+            name_en="Buckwheat / Whole Wheat Roti (2 pcs)",
+            portion_desc="२ वटा",
+            weight_g=130,
+            calories=round(din_cal * 0.45),
+            protein_g=8.0,
+            carbs_g=48.0,
+            fat_g=2.5,
+            notes="Low glycemic index night carb"
+        ),
+        MealPlanItem(
+            item_id="gundruk_bhatmas_soup",
+            name_ne="गुन्द्रुक र भटमासको झोल",
+            name_en="Gundruk & Soybean Probiotic Stew",
+            portion_desc="१ कचौरा",
+            weight_g=180,
+            calories=round(din_cal * 0.30),
+            protein_g=9.5,
+            carbs_g=14.0,
+            fat_g=4.0,
+            notes="Fermented probiotic gut protection"
+        ),
+        MealPlanItem(
+            item_id="mula_golbheda_achar",
+            name_ne="मूला र गोलभेँडाको ताजा अचार",
+            name_en="Tomato & Radish Spiced Achar",
+            portion_desc="२ चम्चा",
+            weight_g=50,
+            calories=round(din_cal * 0.25),
+            protein_g=1.8,
+            carbs_g=7.5,
+            fat_g=2.0,
+            notes="Digestive enzymes and Vitamin C"
+        ),
+    ]
+
+    def _pack_meal(m_type: str, title_ne: str, title_en: str, time_h: str, t_cal: int, items: List[MealPlanItem]) -> PlannedMeal:
+        c = int(round(sum(it.calories for it in items)))
+        p = round(sum(it.protein_g for it in items), 1)
+        cr = round(sum(it.carbs_g for it in items), 1)
+        f = round(sum(it.fat_g for it in items), 1)
+        return PlannedMeal(
+            meal_type=m_type,
+            title_ne=title_ne,
+            title_en=title_en,
+            time_hint=time_h,
+            target_calories=int(round(t_cal)),
+            items=items,
+            total_calories=c,
+            total_protein_g=p,
+            total_carbs_g=cr,
+            total_fat_g=f,
+        )
+
+    meals = [
+        _pack_meal("breakfast", "बिहानीको खाजा (Breakfast)", "Morning Energizer", "7:30 AM - 8:30 AM", bf_cal, bf_items),
+        _pack_meal("lunch", "दिउँसोको मुख्य खाना (Lunch)", "Traditional Balanced Platter", "11:30 AM - 1:00 PM", lunch_cal, lunch_items),
+        _pack_meal("snack", "दिउँसोको खाजा (Snack)", "Indigenous Power Snack", "4:00 PM - 5:00 PM", snack_cal, snack_items),
+        _pack_meal("dinner", "साँझको खाना (Dinner)", "Light Nutrient-Dense Dinner", "7:30 PM - 8:30 PM", din_cal, din_items),
+    ]
+
+    total_plan_cal = sum(m.total_calories for m in meals)
+    total_plan_pro = round(sum(m.total_protein_g for m in meals), 1)
+
+    tips_ne = [
+        "दैनिक कम्तीमा २ देखि २.५ लिटर पानी पिउनुहोस्।",
+        "भातको भाग धेरै हुनुभन्दा बाक्लो दाल र हरियो सागको भाग बढी राख्नुहोस्।",
+        "खानामा भुटेको भटमास, अण्डा र उमारेको क्वाँटी जस्ता सस्तो प्रोटिन नियमित गर्नुहोस्।",
+    ]
+    tips_en = [
+        "Drink at least 2.0 to 2.5 Liters of water throughout the day.",
+        "Follow the 1:1 rule: ensure dense lentils & greens match or exceed rice portion.",
+        "Rely on low-cost superfoods: roasted soybeans, boiled eggs, and sprouted Kwati.",
+    ]
+
+    return DailyDietPlan(
+        plan_date=date.today().isoformat(),
+        target_daily_calories=target_cal,
+        target_daily_protein_g=target_pro,
+        meals=meals,
+        total_planned_calories=total_plan_cal,
+        total_planned_protein_g=total_plan_pro,
+        health_goal=profile.goal.value,
+        tips_ne=tips_ne,
+        tips_en=tips_en,
+    )
+
 

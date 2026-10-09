@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 from typing import List, Optional
+from datetime import datetime
 from PIL import Image
 
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
@@ -37,6 +38,15 @@ from core.advisor_engine import (
     evaluate_meal_against_bmr,
     PoshanChatbot,
     MealEvaluationVerdict,
+    generate_nepali_diet_plan,
+    DailyDietPlan,
+)
+from core.diet_history import (
+    log_meal,
+    get_history,
+    delete_log,
+    get_weekly_calorie_tracker,
+    seed_demo_history_if_empty,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -94,6 +104,25 @@ class CustomMealCalculateRequest(BaseModel):
     custom_profile: Optional[UserProfile] = None
 
 
+class PlanGenerateRequest(BaseModel):
+    profile: Optional[UserProfile] = None
+    preference: str = "all"  # "all", "veg", "budget"
+
+
+class LogMealRequest(BaseModel):
+    user_id: str = "default"
+    meal_type: str = "lunch"
+    food_name: str
+    portion_desc: str = ""
+    calories: float
+    protein_g: float = 0.0
+    carbs_g: float = 0.0
+    fat_g: float = 0.0
+    is_cheat: bool = False
+    notes: str = ""
+    date: Optional[str] = None
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
     index_file = STATIC_DIR / "index.html"
@@ -114,6 +143,8 @@ async def login(req: LoginRequest):
         goal=req.goal,
     )
     assessment = assess_nutrition(profile)
+    # Seed sample weekly history if new so weekly chart displays immediate insights
+    seed_demo_history_if_empty(user_id=req.name, target_kcal=int(assessment.tdee_kcal))
     return {
         "status": "success",
         "user_name": req.name,
@@ -336,6 +367,86 @@ async def chat(req: ChatRequest):
         language=req.language,
     )
     return {"status": "success", "reply": reply}
+
+
+@app.post("/api/planner/generate")
+async def generate_plan(req: PlanGenerateRequest):
+    """Generate personalized daily Nepali meal plan based on BMR/TDEE & dietary goals."""
+    profile = req.profile or UserProfile(
+        age_years=24,
+        sex=BiologicalSex.MALE,
+        height_cm=170.0,
+        weight_kg=62.0,
+        activity_level=ActivityLevel.MODERATE,
+        goal=HealthGoal.MAINTAIN,
+    )
+    assessment = assess_nutrition(profile)
+    plan = generate_nepali_diet_plan(profile, assessment, preference=req.preference)
+    return {
+        "status": "success",
+        "plan": plan.model_dump(),
+        "assessment": assessment.model_dump(),
+    }
+
+
+@app.post("/api/history/log")
+async def add_history_log(req: LogMealRequest):
+    """Log an eaten meal or cheat meal to persistent diet history."""
+    log_id = log_meal(
+        user_id=req.user_id,
+        meal_type=req.meal_type,
+        food_name=req.food_name,
+        portion_desc=req.portion_desc,
+        calories=req.calories,
+        protein_g=req.protein_g,
+        carbs_g=req.carbs_g,
+        fat_g=req.fat_g,
+        is_cheat=req.is_cheat,
+        notes=req.notes,
+        log_date=req.date,
+    )
+    return {
+        "status": "success",
+        "log_id": log_id,
+        "message": "Meal logged to diet history successfully.",
+    }
+
+
+@app.get("/api/history/list")
+async def list_history(user_id: str = "default", days: int = 30):
+    """Retrieve user diet history logs up to 30 days."""
+    logs = get_history(user_id=user_id, days=days)
+    return {"status": "success", "count": len(logs), "logs": logs}
+
+
+@app.delete("/api/history/{log_id}")
+async def remove_history_log(log_id: int):
+    """Delete a diet history entry."""
+    ok = delete_log(log_id)
+    return {"status": "success" if ok else "failed", "deleted": ok}
+
+
+@app.get("/api/history/weekly-tracker")
+async def get_weekly_tracker(user_id: str = "default", target_kcal: int = 2100):
+    """Weekly calorie intake vs budget tracker for homepage chart."""
+    # Ensure some history is seeded for guest demo if empty
+    seed_demo_history_if_empty(user_id=user_id, target_kcal=target_kcal)
+    stats = get_weekly_calorie_tracker(user_id=user_id, daily_target_kcal=target_kcal)
+    return {"status": "success", "stats": stats}
+
+
+@app.get("/api/history/doctor-report-data")
+async def get_doctor_report_data(user_id: str = "default", target_kcal: int = 2100):
+    """Compile 1-month comprehensive diet history and stats for physician report."""
+    logs = get_history(user_id=user_id, days=30)
+    tracker = get_weekly_calorie_tracker(user_id=user_id, daily_target_kcal=target_kcal)
+    return {
+        "status": "success",
+        "user_id": user_id,
+        "logs_30_days": logs,
+        "weekly_stats": tracker,
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
 
 
 if __name__ == "__main__":

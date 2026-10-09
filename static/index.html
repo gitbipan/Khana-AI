@@ -6,10 +6,13 @@
     <title>PoshanAI - पोषण AI | Nepali Food Nutrition & Malnutrition Advisory</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js CDN for interactive Bar and Pie charts -->
+    <!-- Chart.js CDN for interactive Bar, Line and Pie charts -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Lucide Icons CDN -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- jsPDF & autoTable CDN for 1-Click Instant Doctor Nutrition PDF Reports -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/custom.css">
     <script>
@@ -18,12 +21,17 @@
                 extend: {
                     colors: {
                         brand: {
-                            50: '#fef2f2',
-                            100: '#fee2e2',
-                            500: '#ef4444',
-                            600: '#dc2626',
-                            700: '#b91c1c',
-                            800: '#991b1b',
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                        },
+                        amberbrand: {
+                            500: '#d97706',
+                            600: '#b45309',
                         }
                     }
                 }
@@ -31,17 +39,17 @@
         }
     </script>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800">
+<body class="bg-[#faf8f5] min-h-screen text-slate-800 antialiased">
 
     <!-- ========================================================= -->
     <!-- SCREEN 1: DEDICATED SEPARATE LOGIN & ONBOARDING SCREEN     -->
     <!-- ========================================================= -->
-    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-red-600 via-orange-600 to-amber-700">
+    <div id="login-screen" class="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900">
         <div class="max-w-xl w-full bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl p-6 sm:p-8 border border-white/40">
             <!-- Header & Logo -->
             <div class="text-center mb-6">
-                <div class="inline-flex items-center justify-center w-16 h-16 bg-red-100 text-red-600 rounded-2xl shadow-inner mb-3">
-                    <i data-lucide="utensils" class="w-8 h-8"></i>
+                <div class="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 text-emerald-700 rounded-2xl shadow-inner mb-3">
+                    <i data-lucide="leaf" class="w-8 h-8"></i>
                 </div>
                 <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight" id="login-title">
                     🍲 PoshanAI : पोषण AI
@@ -50,13 +58,13 @@
                     नेपाली खानाको तस्विरबाट क्यालोरी पहिचान र BMR अनुसार कुपोषण रोकथाम परामर्श
                 </p>
                 <div class="flex items-center justify-center gap-2 mt-3 flex-wrap">
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-orange-100 text-orange-700">
-                        🎃 Hacktoberfest 2026
+                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">
+                        🌱 स्वस्थ जीवन
                     </span>
                     <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
-                        🤖 Gemma AI Vision
+                        🤖 Gemini Multimodal AI
                     </span>
-                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700">
+                    <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">
                         🩺 WHO South Asian Standard
                     </span>
                 </div>
@@ -74,17 +82,17 @@
             <form id="form-login" onsubmit="handleLoginSubmit(event)" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-name">पूरा नाम / Full Name</label>
-                    <input type="text" id="login-name" required value="बैभव (Baibhav)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm font-medium">
+                    <input type="text" id="login-name" required value="बिपान (Bipan)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm font-medium">
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-age">उमेर (वर्ष) / Age</label>
-                        <input type="number" id="login-age" min="5" max="110" value="24" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-sm font-medium">
+                        <input type="number" id="login-age" min="5" max="110" value="23" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-medium">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-sex">लिङ्ग / Sex</label>
-                        <select id="login-sex" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-sm font-medium">
+                        <select id="login-sex" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-medium">
                             <option value="male">पुरुष (Male)</option>
                             <option value="female">महिला (Female)</option>
                         </select>
@@ -94,17 +102,17 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-height">उचाइ (cm) / Height</label>
-                        <input type="number" id="login-height" min="60" max="230" step="0.5" value="170" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-sm font-medium">
+                        <input type="number" id="login-height" min="60" max="230" step="0.5" value="172" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-medium">
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-weight">तौल (kg) / Weight</label>
-                        <input type="number" id="login-weight" min="15" max="200" step="0.5" value="62" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-sm font-medium">
+                        <input type="number" id="login-weight" min="15" max="200" step="0.5" value="64" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-medium">
                     </div>
                 </div>
 
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-activity">दैनिक शारीरिक सक्रियता / Physical Activity</label>
-                    <select id="login-activity" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-sm font-medium">
+                    <select id="login-activity" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-medium">
                         <option value="sedentary">न्यून शारीरिक परिश्रम (Sedentary / Desk Job)</option>
                         <option value="light">हल्का हिँडडुल (Light 1-3 days/wk)</option>
                         <option value="moderate" selected>मध्यम सक्रिय / सामान्य काम (Moderate)</option>
@@ -115,7 +123,7 @@
 
                 <div>
                     <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1" id="lbl-goal">स्वास्थ्य लक्ष्य / Nutrition Goal</label>
-                    <select id="login-goal" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-sm font-medium">
+                    <select id="login-goal" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-sm font-medium">
                         <option value="maintain" selected>तौल र ऊर्जा सन्तुलन (Maintain Weight)</option>
                         <option value="malnutrition_recovery">कुपोषण / दुब्लोपन हटाउने (Malnutrition Recovery / Underweight)</option>
                         <option value="weight_loss">तौल / बोसो घटाउने (Fat Loss)</option>
@@ -125,7 +133,7 @@
 
                 <!-- Submit & Quick Demo Buttons -->
                 <div class="pt-2 space-y-2">
-                    <button type="submit" class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2">
+                    <button type="submit" class="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2">
                         <i data-lucide="check-circle" class="w-5 h-5"></i>
                         <span id="btn-login-submit">🚀 मेरो पोषण प्रोफाइल सुरु गर्नुहोस्</span>
                     </button>
@@ -145,16 +153,16 @@
     <div id="app-screen" class="hidden min-h-screen flex flex-col">
 
         <!-- Top Navigation Bar -->
-        <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm">
+        <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-emerald-100 shadow-sm">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
                 <!-- Brand Logo & Name -->
                 <div class="flex items-center gap-3 cursor-pointer" onclick="switchNav('dashboard')">
-                    <div class="w-10 h-10 bg-gradient-to-tr from-red-600 to-orange-500 rounded-xl flex items-center justify-center text-white shadow-md">
-                        <i data-lucide="utensils" class="w-5 h-5"></i>
+                    <div class="w-10 h-10 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-xl flex items-center justify-center text-white shadow-md">
+                        <i data-lucide="leaf" class="w-5 h-5"></i>
                     </div>
                     <div>
                         <span class="font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight flex items-center gap-1.5">
-                            PoshanAI <span class="text-red-600 font-bold">पोषण AI</span>
+                            PoshanAI <span class="text-emerald-600 font-bold">पोषण AI</span>
                         </span>
                         <span class="hidden sm:inline-block text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
                             Open-Source Nepali Nutrition
@@ -163,34 +171,42 @@
                 </div>
 
                 <!-- Navigation Shortcuts (Desktop) -->
-                <nav class="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+                <nav class="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60">
                     <button onclick="switchNav('dashboard')" id="nav-btn-dashboard" class="nav-pill active px-3.5 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
                         <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
                         <span class="nav-text-dashboard">डैशबोर्ड</span>
                     </button>
+                    <button onclick="switchNav('planner')" id="nav-btn-planner" class="nav-pill px-3.5 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
+                        <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+                        <span class="nav-text-planner">खाना तालिका (Planner)</span>
+                    </button>
+                    <button onclick="switchNav('history')" id="nav-btn-history" class="nav-pill px-3.5 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
+                        <i data-lucide="clipboard-list" class="w-4 h-4 text-blue-600"></i>
+                        <span class="nav-text-history">इतिहास तथा डाक्टर रिपोर्ट</span>
+                    </button>
                     <button onclick="switchNav('scanner')" id="nav-btn-scanner" class="nav-pill px-3.5 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
-                        <i data-lucide="camera" class="w-4 h-4"></i>
+                        <i data-lucide="camera" class="w-4 h-4 text-amber-600"></i>
                         <span class="nav-text-scanner">खाना स्क्यानर</span>
                     </button>
                     <button onclick="switchNav('chat')" id="nav-btn-chat" class="nav-pill px-3.5 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
-                        <i data-lucide="bot" class="w-4 h-4"></i>
+                        <i data-lucide="bot" class="w-4 h-4 text-purple-600"></i>
                         <span class="nav-text-chat">पोषण साथी (AI)</span>
                     </button>
                     <button onclick="switchNav('explorer')" id="nav-btn-explorer" class="nav-pill px-3.5 py-1.5 text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
-                        <i data-lucide="book-open" class="w-4 h-4"></i>
+                        <i data-lucide="book-open" class="w-4 h-4 text-teal-600"></i>
                         <span class="nav-text-explorer">रैथाने ज्ञानकोष</span>
                     </button>
                 </nav>
 
                 <!-- Actions: Language Switch & Hamburger Menu Button -->
                 <div class="flex items-center gap-2 sm:gap-3">
-                    <button onclick="toggleLanguage()" class="p-2 sm:px-3 sm:py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 transition flex items-center gap-1.5">
+                    <button onclick="toggleLanguage()" class="p-2 sm:px-3 sm:py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition flex items-center gap-1.5 shadow-sm">
                         <i data-lucide="globe" class="w-4 h-4 text-slate-500"></i>
                         <span id="nav-lang-tag" class="hidden sm:inline">English</span>
                     </button>
 
                     <!-- Hamburger Button (☰) -->
-                    <button onclick="toggleHamburgerDrawer()" aria-label="Open Profile Menu" class="p-2 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 transition focus:outline-none flex items-center gap-1.5">
+                    <button onclick="toggleHamburgerDrawer()" aria-label="Open Profile Menu" class="p-2 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition focus:outline-none flex items-center gap-1.5">
                         <i data-lucide="menu" class="w-5 h-5"></i>
                         <span class="hidden sm:inline text-xs font-bold" id="nav-menu-btn-text">प्रोफाइल</span>
                     </button>
@@ -208,7 +224,7 @@
                 <!-- Drawer Header & Close Button -->
                 <div class="flex items-center justify-between pb-4 border-b border-slate-200">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center font-bold">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                             <i data-lucide="user" class="w-4 h-4"></i>
                         </div>
                         <h2 class="text-base font-bold text-slate-800" id="drawer-title">स्वास्थ्य प्रोफाइल (Profile)</h2>
@@ -219,20 +235,20 @@
                 </div>
 
                 <!-- User Profile Summary Card -->
-                <div class="mt-5 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-red-50/40 border border-red-100 shadow-sm">
+                <div class="mt-5 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-emerald-50/50 border border-emerald-100 shadow-sm">
                     <div class="flex items-center gap-3">
-                        <div class="w-12 h-12 rounded-full bg-red-600 text-white font-black text-xl flex items-center justify-center shadow-md">
-                            <span id="drawer-user-initial">ब</span>
+                        <div class="w-12 h-12 rounded-full bg-emerald-600 text-white font-black text-xl flex items-center justify-center shadow-md">
+                            <span id="drawer-user-initial">वि</span>
                         </div>
                         <div>
-                            <h3 class="text-base font-bold text-slate-900" id="drawer-user-name">बैभव</h3>
-                            <p class="text-xs text-slate-500" id="drawer-user-specs">२४ वर्ष • पुरुष • १७० cm • ६२ kg</p>
+                            <h3 class="text-base font-bold text-slate-900" id="drawer-user-name">बिपान</h3>
+                            <p class="text-xs text-slate-500" id="drawer-user-specs">२३ वर्ष • पुरुष • १७२ cm • ६४ kg</p>
                         </div>
                     </div>
                     <!-- BMI Badge -->
                     <div class="mt-3 flex items-center justify-between pt-2 border-t border-slate-200/60 text-xs">
                         <span class="font-semibold text-slate-600">WHO South Asian BMI:</span>
-                        <span id="drawer-bmi-badge" class="px-2.5 py-0.5 rounded-full font-bold bg-green-100 text-green-700">२१.५ (सामान्य)</span>
+                        <span id="drawer-bmi-badge" class="px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800">२१.६ (सामान्य स्वस्थ)</span>
                     </div>
                 </div>
 
@@ -242,22 +258,22 @@
                     
                     <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
                         <span class="text-xs text-slate-600 font-medium">आधारभूत क्यालोरी (BMR)</span>
-                        <span class="text-sm font-bold text-slate-900" id="drawer-bmr-val">१५५० kcal</span>
+                        <span class="text-sm font-bold text-slate-900" id="drawer-bmr-val">१५८० kcal</span>
                     </div>
 
                     <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
                         <span class="text-xs text-slate-600 font-medium">कुल दैनिक खर्च (TDEE)</span>
-                        <span class="text-sm font-bold text-slate-900" id="drawer-tdee-val">२४०२ kcal</span>
+                        <span class="text-sm font-bold text-slate-900" id="drawer-tdee-val">२४४९ kcal</span>
                     </div>
 
-                    <div class="p-3 rounded-lg bg-red-50/60 border border-red-200 flex items-center justify-between">
-                        <span class="text-xs text-red-700 font-semibold">दैनिक लक्ष्य क्यालोरी (Target)</span>
-                        <span class="text-sm font-extrabold text-red-600" id="drawer-target-cal">२४०२ kcal</span>
+                    <div class="p-3 rounded-lg bg-emerald-50/80 border border-emerald-200 flex items-center justify-between">
+                        <span class="text-xs text-emerald-800 font-semibold">दैनिक लक्ष्य क्यालोरी (Target)</span>
+                        <span class="text-sm font-extrabold text-emerald-700" id="drawer-target-cal">२४४९ kcal</span>
                     </div>
 
                     <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
                         <span class="text-xs text-slate-600 font-medium">प्रोटिन लक्ष्य (Protein RDA)</span>
-                        <span class="text-sm font-bold text-slate-900" id="drawer-target-pro">७४.४ g (१.२ g/kg)</span>
+                        <span class="text-sm font-bold text-slate-900" id="drawer-target-pro">७६.८ g (१.२ g/kg)</span>
                     </div>
 
                     <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
@@ -278,19 +294,27 @@
                 <div class="mt-6 pt-4 border-t border-slate-200 space-y-1">
                     <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2" id="drawer-nav-title">द्रुत नेभिगेसन (Quick Links)</h4>
                     <button onclick="switchNav('dashboard'); toggleHamburgerDrawer()" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2">
-                        <i data-lucide="layout-dashboard" class="w-4 h-4 text-red-500"></i>
+                        <i data-lucide="layout-dashboard" class="w-4 h-4 text-emerald-600"></i>
                         <span class="nav-text-dashboard">डैशबोर्ड तथा इन्फोग्राफिक्स</span>
                     </button>
+                    <button onclick="switchNav('planner'); toggleHamburgerDrawer()" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2">
+                        <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+                        <span class="nav-text-planner">खाना तालिका (Daily Diet Planner)</span>
+                    </button>
+                    <button onclick="switchNav('history'); toggleHamburgerDrawer()" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2">
+                        <i data-lucide="clipboard-list" class="w-4 h-4 text-blue-600"></i>
+                        <span class="nav-text-history">इतिहास तथा डाक्टर रिपोर्ट (PDF)</span>
+                    </button>
                     <button onclick="switchNav('scanner'); toggleHamburgerDrawer()" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2">
-                        <i data-lucide="camera" class="w-4 h-4 text-orange-500"></i>
+                        <i data-lucide="camera" class="w-4 h-4 text-amber-600"></i>
                         <span class="nav-text-scanner">नेपाली खाना स्क्यानर</span>
                     </button>
                     <button onclick="switchNav('chat'); toggleHamburgerDrawer()" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2">
-                        <i data-lucide="bot" class="w-4 h-4 text-blue-500"></i>
+                        <i data-lucide="bot" class="w-4 h-4 text-purple-600"></i>
                         <span class="nav-text-chat">पोषण साथी (AI सल्लाहकार)</span>
                     </button>
                     <button onclick="switchNav('explorer'); toggleHamburgerDrawer()" class="w-full text-left px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100 rounded-lg flex items-center gap-2">
-                        <i data-lucide="book-open" class="w-4 h-4 text-green-500"></i>
+                        <i data-lucide="book-open" class="w-4 h-4 text-teal-600"></i>
                         <span class="nav-text-explorer">रैथाने खाना ज्ञानकोष</span>
                     </button>
                 </div>
@@ -298,7 +322,7 @@
 
             <!-- Logout Button -->
             <div class="pt-6 border-t border-slate-200">
-                <button onclick="handleLogout()" class="w-full py-2.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-red-200">
+                <button onclick="handleLogout()" class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-slate-300">
                     <i data-lucide="log-out" class="w-4 h-4"></i>
                     <span id="btn-logout-text">लगआउट (Sign Out)</span>
                 </button>
@@ -315,27 +339,31 @@
             <!-- SECTION 1: DASHBOARD & HEALTH INFOGRAPHICS            -->
             <!-- ===================================================== -->
             <section id="view-dashboard" class="space-y-6">
-                <!-- Welcome Banner -->
-                <div class="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 text-white shadow-xl relative overflow-hidden">
+                <!-- Welcome Banner (Warm Google Emerald Gradient) -->
+                <div class="p-6 sm:p-8 rounded-2xl bg-gradient-to-r from-emerald-700 via-green-700 to-teal-800 text-white shadow-xl relative overflow-hidden">
                     <div class="relative z-10 max-w-2xl">
                         <span class="px-3 py-1 rounded-full bg-white/20 text-xs font-bold backdrop-blur-sm" id="dash-badge">
-                            ✨ व्यक्तिगत पोषण केन्द्र
+                            🌱 व्यक्तिगत पोषण केन्द्र
                         </span>
                         <h2 class="text-2xl sm:text-4xl font-extrabold mt-3 tracking-tight" id="dash-greeting">
-                            नमस्ते, बैभव!
+                            नमस्ते, बिपान!
                         </h2>
-                        <p class="mt-2 text-sm sm:text-base text-red-50 leading-relaxed" id="dash-desc">
-                            तपाईंको दैनिक BMR आधारभूत ऊर्जा <strong id="dash-bmr-text">१५५० kcal</strong> हो। 
-                            तपाईंको स्वस्थ तौल र सक्रियताका लागि दैनिक <strong id="dash-target-text">२४०२ kcal</strong> र <strong id="dash-pro-text">७४.४g प्रोटिन</strong> सिफारिस गरिएको छ।
+                        <p class="mt-2 text-sm sm:text-base text-emerald-50 leading-relaxed" id="dash-desc">
+                            तपाईंको दैनिक BMR आधारभूत ऊर्जा <strong id="dash-bmr-text">१५८० kcal</strong> हो। 
+                            तपाईंको स्वस्थ तौल र सक्रियताका लागि दैनिक <strong id="dash-target-text">२४४९ kcal</strong> र <strong id="dash-pro-text">७६.८g प्रोटिन</strong> सिफारिस गरिएको छ।
                         </p>
                         <div class="mt-5 flex flex-wrap gap-3">
-                            <button onclick="switchNav('scanner')" class="px-4 py-2.5 bg-white text-red-600 font-bold rounded-xl text-xs sm:text-sm shadow-md hover:bg-red-50 transition flex items-center gap-2">
+                            <button onclick="switchNav('planner')" class="px-4 py-2.5 bg-white text-emerald-800 font-bold rounded-xl text-xs sm:text-sm shadow-md hover:bg-emerald-50 transition flex items-center gap-2">
+                                <i data-lucide="calendar-check" class="w-4 h-4 text-emerald-600"></i>
+                                <span>खाना तालिका हेर्नुहोस्</span>
+                            </button>
+                            <button onclick="switchNav('scanner')" class="px-4 py-2.5 bg-emerald-800/80 hover:bg-emerald-800 text-white font-bold rounded-xl text-xs sm:text-sm border border-white/20 transition flex items-center gap-2">
                                 <i data-lucide="camera" class="w-4 h-4"></i>
                                 <span id="dash-btn-scan">खाना स्क्यान गर्नुहोस्</span>
                             </button>
-                            <button onclick="switchNav('chat')" class="px-4 py-2.5 bg-red-700/60 hover:bg-red-700 text-white font-bold rounded-xl text-xs sm:text-sm border border-white/20 transition flex items-center gap-2">
-                                <i data-lucide="bot" class="w-4 h-4"></i>
-                                <span id="dash-btn-chat">पोषण साथीसँग सोध्नुहोस्</span>
+                            <button onclick="switchNav('history')" class="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl text-xs sm:text-sm border border-white/20 transition flex items-center gap-2">
+                                <i data-lucide="file-text" class="w-4 h-4"></i>
+                                <span>डाक्टर PDF रिपोर्ट</span>
                             </button>
                         </div>
                     </div>
@@ -345,32 +373,87 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div class="glass-card p-4 text-center">
                         <span class="text-xs font-bold text-slate-500 uppercase">BMI (South Asian)</span>
-                        <p class="text-2xl sm:text-3xl font-extrabold text-red-600 mt-1" id="stat-bmi">२१.५</p>
-                        <span class="text-[11px] font-semibold text-green-600 px-2 py-0.5 rounded-full bg-green-50 inline-block mt-1" id="stat-bmi-cat">सामान्य स्वस्थ</span>
+                        <p class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-1" id="stat-bmi">२१.६</p>
+                        <span class="text-[11px] font-semibold text-emerald-700 px-2 py-0.5 rounded-full bg-emerald-50 inline-block mt-1" id="stat-bmi-cat">सामान्य स्वस्थ</span>
                     </div>
                     <div class="glass-card p-4 text-center">
                         <span class="text-xs font-bold text-slate-500 uppercase">BMR (आधारभूत)</span>
-                        <p class="text-2xl sm:text-3xl font-extrabold text-orange-600 mt-1" id="stat-bmr">१५५०</p>
+                        <p class="text-2xl sm:text-3xl font-extrabold text-teal-600 mt-1" id="stat-bmr">१५८०</p>
                         <span class="text-[11px] text-slate-500 inline-block mt-1">kcal / दिन</span>
                     </div>
                     <div class="glass-card p-4 text-center">
                         <span class="text-xs font-bold text-slate-500 uppercase">TDEE (कुल खपत)</span>
-                        <p class="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1" id="stat-tdee">२४०२</p>
+                        <p class="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1" id="stat-tdee">२४४९</p>
                         <span class="text-[11px] text-slate-500 inline-block mt-1">kcal / दिन</span>
                     </div>
                     <div class="glass-card p-4 text-center">
                         <span class="text-xs font-bold text-slate-500 uppercase">प्रोटिन लक्ष्य</span>
-                        <p class="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-1" id="stat-protein">७४.४</p>
+                        <p class="text-2xl sm:text-3xl font-extrabold text-green-700 mt-1" id="stat-protein">७६.८</p>
                         <span class="text-[11px] text-slate-500 inline-block mt-1">ग्राम / दिन</span>
                     </div>
                 </div>
 
-                <!-- Visual Infographic Row 1: The Balanced Nepali Plate & Malnutrition Severity Meter -->
+                <!-- ===================================================== -->
+                <!-- PROMINENT NEW CARD: PAST WEEK CALORIE BUDGET GRAPH    -->
+                <!-- ===================================================== -->
+                <div class="glass-card p-6 space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="bar-chart-2" class="w-5 h-5 text-emerald-600"></i>
+                                <h3 class="font-extrabold text-base sm:text-lg text-slate-900" id="weekly-graph-title">
+                                    📊 बितेको हप्ताको क्यालोरी बजेट विश्लेषण (Past Week Calorie Budget)
+                                </h3>
+                            </div>
+                            <p class="text-xs text-slate-600 mt-0.5" id="weekly-graph-sub">
+                                तपाईंको दैनिक क्यालोरी बजेट (TDEE) तुलनामा प्रत्येक दिनको वास्तविक खपत: बजेट मिलेको, कम (Undershot) वा बढी (Overshot)।
+                            </p>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> सन्तुलित (Target)
+                            </span>
+                            <span class="inline-flex items-center gap-1 font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">
+                                <span class="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block"></span> कम (Undershot)
+                            </span>
+                            <span class="inline-flex items-center gap-1 font-semibold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200">
+                                <span class="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span> बढी (Overshot)
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Weekly Chart Canvas -->
+                    <div class="chart-box" style="min-height: 250px; max-height: 300px;">
+                        <canvas id="chart-weekly-budget"></canvas>
+                    </div>
+
+                    <!-- Weekly Summary Stats Bar -->
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase block">दैनिक बजेट लक्ष्य</span>
+                            <strong class="text-base font-extrabold text-slate-800" id="stat-weekly-target">२४४९ kcal</strong>
+                        </div>
+                        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase block">औसत दैनिक खपत</span>
+                            <strong class="text-base font-extrabold text-emerald-700" id="stat-weekly-avg">२३८० kcal</strong>
+                        </div>
+                        <div class="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200 text-center">
+                            <span class="text-[10px] font-bold text-emerald-700 uppercase block">सन्तुलित दिनहरू (On Target)</span>
+                            <strong class="text-base font-extrabold text-emerald-700" id="stat-weekly-on">४ दिन</strong>
+                        </div>
+                        <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200 text-center">
+                            <span class="text-[10px] font-bold text-amber-700 uppercase block">उतारचढाव (Deviation)</span>
+                            <strong class="text-base font-extrabold text-amber-700" id="stat-weekly-dev">१ दिन बढी / २ दिन कम</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual Infographic Row: Balanced Nepali Plate & Malnutrition Severity Meter -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <!-- Infographic: The Balanced Nepali Plate -->
                     <div class="glass-card p-6">
                         <div class="flex items-center gap-2 mb-4">
-                            <i data-lucide="pie-chart" class="w-5 h-5 text-red-600"></i>
+                            <i data-lucide="pie-chart" class="w-5 h-5 text-emerald-600"></i>
                             <h3 class="font-bold text-base text-slate-900" id="info-plate-title">नेपाली सन्तुलित थाली (The Balanced Nepali Plate)</h3>
                         </div>
                         <p class="text-xs text-slate-600 mb-6" id="info-plate-sub">
@@ -388,21 +471,21 @@
                             <!-- Legend -->
                             <div class="space-y-3 text-xs w-full sm:w-auto">
                                 <div class="flex items-start gap-2.5">
-                                    <span class="w-3.5 h-3.5 rounded-full bg-green-600 flex-shrink-0 mt-0.5"></span>
+                                    <span class="w-3.5 h-3.5 rounded-full bg-emerald-600 flex-shrink-0 mt-0.5"></span>
                                     <div>
                                         <strong class="text-slate-800">५०% हरियो साग र तरकारी (Greens)</strong>
                                         <p class="text-[11px] text-slate-500">रायो/पालुङ्गो, काउली, सिमी (भिटामिन र आइरन)</p>
                                     </div>
                                 </div>
                                 <div class="flex items-start gap-2.5">
-                                    <span class="w-3.5 h-3.5 rounded-full bg-orange-600 flex-shrink-0 mt-0.5"></span>
+                                    <span class="w-3.5 h-3.5 rounded-full bg-amber-600 flex-shrink-0 mt-0.5"></span>
                                     <div>
                                         <strong class="text-slate-800">२५% प्रोटिन र गेडागुडी (Protein)</strong>
                                         <p class="text-[11px] text-slate-500">बाक्लो दाल, क्वाँटी, उसिनेको अण्डा, भटमास</p>
                                     </div>
                                 </div>
                                 <div class="flex items-start gap-2.5">
-                                    <span class="w-3.5 h-3.5 rounded-full bg-yellow-500 flex-shrink-0 mt-0.5"></span>
+                                    <span class="w-3.5 h-3.5 rounded-full bg-green-700 flex-shrink-0 mt-0.5"></span>
                                     <div>
                                         <strong class="text-slate-800">२५% अन्न / ऊर्जा (Energy Carbs)</strong>
                                         <p class="text-[11px] text-slate-500">कोदोको ढिँडो, रातो भात, मकै, थोरै सेतो भात</p>
@@ -416,7 +499,7 @@
                     <div class="glass-card p-6 flex flex-col justify-between">
                         <div>
                             <div class="flex items-center gap-2 mb-3">
-                                <i data-lucide="activity" class="w-5 h-5 text-red-600"></i>
+                                <i data-lucide="activity" class="w-5 h-5 text-emerald-600"></i>
                                 <h3 class="font-bold text-base text-slate-900" id="info-meter-title">कुपोषण जोखिम मिटर (WHO South Asian Cutoffs)</h3>
                             </div>
                             <p class="text-xs text-slate-600 mb-4" id="info-meter-sub">
@@ -426,10 +509,10 @@
                             <!-- Visual Bar Scale -->
                             <div class="space-y-2 mt-4">
                                 <div class="h-5 w-full rounded-full flex overflow-hidden shadow-inner text-[10px] text-white font-bold text-center">
-                                    <div class="bg-red-500 w-[20%] flex items-center justify-center">कुपोषण &lt;18.5</div>
-                                    <div class="bg-green-500 w-[35%] flex items-center justify-center">स्वस्थ 18.5-22.9</div>
+                                    <div class="bg-sky-500 w-[20%] flex items-center justify-center">कुपोषण &lt;18.5</div>
+                                    <div class="bg-emerald-500 w-[35%] flex items-center justify-center">स्वस्थ 18.5-22.9</div>
                                     <div class="bg-amber-500 w-[25%] flex items-center justify-center">बढी तौल 23-27.4</div>
-                                    <div class="bg-red-600 w-[20%] flex items-center justify-center">मोटोपन 27.5+</div>
+                                    <div class="bg-orange-600 w-[20%] flex items-center justify-center">मोटोपन 27.5+</div>
                                 </div>
                                 <div class="flex justify-between text-[11px] text-slate-400 font-semibold px-1">
                                     <span>१६.०</span>
@@ -440,8 +523,8 @@
                                 </div>
                             </div>
 
-                            <div class="mt-5 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
-                                <span class="text-xs font-bold text-slate-700 block mb-1">💡 तपाईंको हालको अवस्था:</span>
+                            <div class="mt-5 p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-100">
+                                <span class="text-xs font-bold text-emerald-800 block mb-1">💡 तपाईंको हालको अवस्था:</span>
                                 <p class="text-xs text-slate-600" id="info-status-quote">
                                     तपाईंको BMI सामान्य स्वस्थ दायरामा छ। थप शक्ति र मांसपेशीका लागि खानामा दाल र अण्डाको मात्रा सन्तुलित राख्नुहोस्।
                                 </p>
@@ -452,11 +535,11 @@
                         <div class="mt-4 pt-3 border-t border-slate-200">
                             <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">नेपालका ५ अचुक रैथाने सुपरफुड:</span>
                             <div class="flex flex-wrap gap-1.5 text-xs">
-                                <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-700 font-semibold border border-red-200">कोदोको ढिँडो</span>
-                                <span class="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 font-semibold border border-orange-200">उमारेको क्वाँटी</span>
-                                <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-semibold border border-amber-200">गुन्द्रुक भटमास</span>
-                                <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200">रायोको साग</span>
-                                <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 font-semibold border border-blue-200">पोषण लिटो</span>
+                                <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200">कोदोको ढिँडो</span>
+                                <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 font-semibold border border-amber-200">उमारेको क्वाँटी</span>
+                                <span class="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-800 font-semibold border border-orange-200">गुन्द्रुक भटमास</span>
+                                <span class="px-2.5 py-1 rounded-lg bg-teal-50 text-teal-800 font-semibold border border-teal-200">रायोको साग</span>
+                                <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 font-semibold border border-blue-200">पोषण सातु</span>
                             </div>
                         </div>
                     </div>
@@ -465,7 +548,184 @@
 
 
             <!-- ===================================================== -->
-            <!-- SECTION 2: FOOD SCANNER, CHARTS & MEAL ANALYZER       -->
+            <!-- SECTION 2: DIET PLANNER (खाना तालिका तथा Checklists) -->
+            <!-- ===================================================== -->
+            <section id="view-planner" class="hidden space-y-6">
+                <!-- Planner Header & Action Row -->
+                <div class="p-6 rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-800 text-white shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm mb-2">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                            <span>AI-संचालित नेपाली खाना तालिका</span>
+                        </div>
+                        <h2 class="text-xl sm:text-2xl font-extrabold" id="planner-head-title">
+                            📅 दैनिक पोषण तालिका (Daily Diet Planner)
+                        </h2>
+                        <p class="text-xs sm:text-sm text-emerald-100 mt-1" id="planner-head-sub">
+                            तपाईंको BMR/TDEE आवश्यकता अनुसार बिहानी खाजा, मुख्य खाना र साँझको खानाको सन्तुलित नेपाली तालिका।
+                        </p>
+                    </div>
+
+                    <!-- Preferences and Quick Actions -->
+                    <div class="flex flex-wrap items-center gap-2">
+                        <select id="planner-preference-select" onchange="generateDietPlan()" class="text-xs font-semibold px-3 py-2 rounded-xl bg-white text-slate-800 border-0 shadow-sm focus:ring-2 focus:ring-emerald-400">
+                            <option value="all">सबै परिकार (All Foods)</option>
+                            <option value="veg">शाकाहारी (Vegetarian)</option>
+                            <option value="budget">सस्तो रैथाने (Low-Cost Budget)</option>
+                        </select>
+                        <button onclick="generateDietPlan()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm border border-white/20">
+                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                            <span>नयाँ AI योजना</span>
+                        </button>
+                        <button onclick="openManualMealModal()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                            <span>म्यानुअल / चिट मिल थप्नुहोस्</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Daily Target Overview Banner -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase block">योजना क्यालोरी लक्ष्य</span>
+                        <p class="text-lg font-black text-slate-900 mt-0.5" id="plan-stat-target-cal">२४४९ kcal</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase block">कुल योजना क्यालोरी</span>
+                        <p class="text-lg font-black text-emerald-700 mt-0.5" id="plan-stat-plan-cal">२४४० kcal</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase block">कुल प्रोटिन लक्ष्य</span>
+                        <p class="text-lg font-black text-green-700 mt-0.5" id="plan-stat-target-pro">७६.८ g</p>
+                    </div>
+                    <div class="p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[11px] font-bold text-slate-400 uppercase block">योजनामा प्रोटिन</span>
+                        <p class="text-lg font-black text-teal-700 mt-0.5" id="plan-stat-plan-pro">८४.५ g</p>
+                    </div>
+                </div>
+
+                <!-- 4 Planned Meals Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5" id="planner-meals-container">
+                    <!-- Populated dynamically by JS -->
+                </div>
+
+                <!-- Malnutrition Prevention Practical Tips Card -->
+                <div class="glass-card p-5 border-l-4 border-l-emerald-600 space-y-2">
+                    <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                        <i data-lucide="lightbulb" class="w-4 h-4 text-emerald-600"></i>
+                        <span>कुपोषण रोकथाम व्यवहारिक सल्लाहहरू (Actionable Tips)</span>
+                    </h4>
+                    <ul class="text-xs text-slate-600 space-y-1.5 list-disc list-inside" id="planner-tips-list">
+                        <li>दैनिक कम्तीमा २ देखि २.५ लिटर पानी पिउनुहोस्।</li>
+                        <li>भातको भाग धेरै हुनुभन्दा बाक्लो दाल र हरियो सागको भाग बढी राख्नुहोस्।</li>
+                        <li>खानामा भुटेको भटमास, अण्डा र उमारेको क्वाँटी जस्ता सस्तो प्रोटिन नियमित गर्नुहोस्।</li>
+                    </ul>
+                </div>
+            </section>
+
+
+            <!-- ===================================================== -->
+            <!-- SECTION 3: DIET HISTORY & DOCTOR 1-MONTH PDF REPORT   -->
+            <!-- ===================================================== -->
+            <section id="view-history" class="hidden space-y-6">
+                <!-- History & Doctor Export Header -->
+                <div class="p-6 rounded-2xl bg-gradient-to-r from-teal-800 to-emerald-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <div class="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-sm mb-2">
+                            <i data-lucide="file-badge" class="w-3.5 h-3.5 text-emerald-300"></i>
+                            <span>चिकित्सकीय रेकर्ड तथा प्रतिवेदन</span>
+                        </div>
+                        <h2 class="text-xl sm:text-2xl font-extrabold" id="history-head-title">
+                            📋 खानाको इतिहास तथा डाक्टर रिपोर्ट (Diet History & Medical PDF)
+                        </h2>
+                        <p class="text-xs sm:text-sm text-teal-100 mt-1" id="history-head-sub">
+                            तपाईंले तालिकामा खाएको चेक गर्दा वा म्यानुअल थप्दा यहाँ सुरक्षित हुन्छ। डाक्टरलाई देखाउन १ महिनाको PDF तुरुन्त डाउनलोड गर्नुहोस्।
+                        </p>
+                    </div>
+
+                    <!-- Big Doctor Report Download CTA -->
+                    <div>
+                        <button onclick="downloadDoctorReportPDF()" class="w-full sm:w-auto px-5 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
+                            <i data-lucide="download" class="w-5 h-5"></i>
+                            <span>📥 १ महिनाको डाक्टर रिपोर्ट (PDF) डाउनलोड</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- History Filter and Action Row -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="flex gap-1.5 overflow-x-auto text-xs font-semibold">
+                        <button onclick="filterHistoryDays(30)" id="hist-btn-30" class="hist-filter-pill active px-3.5 py-2 rounded-xl bg-emerald-600 text-white transition flex-shrink-0">
+                            १ महिना (Last 30 Days)
+                        </button>
+                        <button onclick="filterHistoryDays(7)" id="hist-btn-7" class="hist-filter-pill px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition flex-shrink-0">
+                            ७ दिन (Last 7 Days)
+                        </button>
+                        <button onclick="filterHistoryDays(1)" id="hist-btn-1" class="hist-filter-pill px-3.5 py-2 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition flex-shrink-0">
+                            आज (Today)
+                        </button>
+                    </div>
+
+                    <button onclick="openManualMealModal()" class="px-4 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition flex items-center justify-center gap-1.5">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>नयाँ खाना / चिट मिल थप्नुहोस्</span>
+                    </button>
+                </div>
+
+                <!-- Today's Adherence Summary Bar -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">आज खाएको क्यालोरी</span>
+                        <p class="text-xl font-black text-slate-900 mt-1" id="hist-stat-today-cal">० kcal</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">आजको क्यालोरी बजेट</span>
+                        <p class="text-xl font-black text-emerald-700 mt-1" id="hist-stat-today-target">२४४९ kcal</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">आज खाएको प्रोटिन</span>
+                        <p class="text-xl font-black text-green-700 mt-1" id="hist-stat-today-pro">० g</p>
+                    </div>
+                    <div class="p-4 rounded-xl bg-white border border-slate-200 shadow-sm">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase block">रेकर्ड संख्या (३० दिन)</span>
+                        <p class="text-xl font-black text-teal-700 mt-1" id="hist-stat-total-count">० छाक</p>
+                    </div>
+                </div>
+
+                <!-- History Logs Feed / Table Card -->
+                <div class="glass-card overflow-hidden">
+                    <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                        <h3 class="font-extrabold text-sm sm:text-base text-slate-900 flex items-center gap-2">
+                            <i data-lucide="history" class="w-4 h-4 text-emerald-600"></i>
+                            <span>भोजन इतिहास सूची (Meal History Log)</span>
+                        </h3>
+                        <span class="text-xs text-slate-500 font-medium" id="history-count-badge">० रेकर्ड भेटियो</span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-50/80 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-4">मिति / समय</th>
+                                    <th class="py-3 px-4">छाक (Meal)</th>
+                                    <th class="py-3 px-4">परिकार (Food Item)</th>
+                                    <th class="py-3 px-4">क्यालोरी (kcal)</th>
+                                    <th class="py-3 px-4">प्रोटिन (g)</th>
+                                    <th class="py-3 px-4">प्रकार (Type)</th>
+                                    <th class="py-3 px-4 text-right">कार्य</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body" class="divide-y divide-slate-100 font-medium text-slate-700">
+                                <!-- Populated dynamically by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+
+            <!-- ===================================================== -->
+            <!-- SECTION 4: FOOD SCANNER, CHARTS & MEAL ANALYZER       -->
             <!-- ===================================================== -->
             <section id="view-scanner" class="hidden space-y-6">
                 <div class="border-b border-slate-200 pb-4">
@@ -477,7 +737,7 @@
 
                 <!-- Input Selection Tabs -->
                 <div class="flex border-b border-slate-200 gap-2">
-                    <button onclick="switchScannerMode('samples')" id="tab-scan-samples" class="py-2.5 px-4 text-xs font-bold border-b-2 border-red-600 text-red-600 transition flex items-center gap-1.5">
+                    <button onclick="switchScannerMode('samples')" id="tab-scan-samples" class="py-2.5 px-4 text-xs font-bold border-b-2 border-emerald-600 text-emerald-700 transition flex items-center gap-1.5">
                         <i data-lucide="image" class="w-4 h-4"></i>
                         <span id="tab-samples-text">नमुना परिकारहरू (Quick Samples)</span>
                     </button>
@@ -501,9 +761,9 @@
 
                 <!-- Mode 2: Upload Mode -->
                 <div id="mode-upload" class="hidden">
-                    <div class="p-8 border-2 border-dashed border-slate-300 hover:border-red-500 rounded-2xl text-center bg-white transition cursor-pointer" onclick="document.getElementById('file-upload-input').click()">
+                    <div class="p-8 border-2 border-dashed border-emerald-300 hover:border-emerald-500 rounded-2xl text-center bg-white transition cursor-pointer" onclick="document.getElementById('file-upload-input').click()">
                         <input type="file" id="file-upload-input" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
-                        <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 mx-auto mb-2"></i>
+                        <i data-lucide="upload-cloud" class="w-10 h-10 text-emerald-500 mx-auto mb-2"></i>
                         <p class="text-sm font-bold text-slate-700" id="upload-prompt-text">खानाको फोटो अपलोड गर्न यहाँ क्लिक गर्नुहोस्</p>
                         <p class="text-xs text-slate-500 mt-1">JPG, PNG, WebP (थाली, म:म:, ढिँडो, आदि)</p>
                     </div>
@@ -522,7 +782,7 @@
                             <i data-lucide="video" class="w-4 h-4"></i>
                             <span>क्यामेरा खोल्नुहोस्</span>
                         </button>
-                        <button onclick="captureCameraSnapshot()" class="px-4 py-2 bg-red-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md">
+                        <button onclick="captureCameraSnapshot()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow-md">
                             <i data-lucide="camera" class="w-4 h-4"></i>
                             <span>फोटो खिच्नुहोस्</span>
                         </button>
@@ -532,7 +792,7 @@
 
                 <!-- Analyze Action CTA Button -->
                 <div class="text-center pt-2">
-                    <button id="btn-trigger-analysis" onclick="executeMealAnalysis()" class="py-3 px-8 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 mx-auto text-sm sm:text-base">
+                    <button id="btn-trigger-analysis" onclick="executeMealAnalysis()" class="py-3 px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-2 mx-auto text-sm sm:text-base">
                         <i data-lucide="sparkles" class="w-5 h-5"></i>
                         <span id="btn-analyze-text">🔍 AI द्वारा खाना विश्लेषण गर्नुहोस्</span>
                     </button>
@@ -563,10 +823,16 @@
                                 <div id="detected-items-container" class="space-y-3">
                                     <!-- Populated by JS -->
                                 </div>
-                                <button onclick="recalculateCurrentMeal()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition flex items-center justify-center gap-1 border border-slate-200 mt-2">
-                                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                                    <span>पुनर्गणना गर्नुहोस् (Recalculate)</span>
-                                </button>
+                                <div class="flex gap-2 mt-2">
+                                    <button onclick="recalculateCurrentMeal()" class="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition flex items-center justify-center gap-1 border border-slate-200">
+                                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                                        <span>पुनर्गणना गर्नुहोस्</span>
+                                    </button>
+                                    <button onclick="logScannedMealToHistory()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition flex items-center justify-center gap-1 shadow-sm">
+                                        <i data-lucide="clipboard-check" class="w-3.5 h-3.5"></i>
+                                        <span>इतिहासमा थप्नुहोस्</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -575,24 +841,24 @@
 
                             <!-- Calorie and Macro Totals Banner -->
                             <div class="grid grid-cols-4 gap-2 text-center">
-                                <div class="p-3 rounded-xl bg-red-50 border border-red-200">
-                                    <span class="text-[10px] font-bold text-red-600 uppercase">क्यालोरी</span>
-                                    <p class="text-xl font-black text-red-700 mt-0.5" id="res-tot-cal">६०५</p>
+                                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                                    <span class="text-[10px] font-bold text-emerald-800 uppercase">क्यालोरी</span>
+                                    <p class="text-xl font-black text-emerald-700 mt-0.5" id="res-tot-cal">६०५</p>
                                     <span class="text-[10px] text-slate-500">kcal</span>
                                 </div>
-                                <div class="p-3 rounded-xl bg-orange-50 border border-orange-200">
-                                    <span class="text-[10px] font-bold text-orange-600 uppercase">प्रोटिन</span>
-                                    <p class="text-xl font-black text-orange-700 mt-0.5" id="res-tot-pro">१५.३</p>
+                                <div class="p-3 rounded-xl bg-teal-50 border border-teal-200">
+                                    <span class="text-[10px] font-bold text-teal-800 uppercase">प्रोटिन</span>
+                                    <p class="text-xl font-black text-teal-700 mt-0.5" id="res-tot-pro">१५.३</p>
                                     <span class="text-[10px] text-slate-500">ग्राम</span>
                                 </div>
                                 <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
-                                    <span class="text-[10px] font-bold text-amber-600 uppercase">कार्ब्स</span>
+                                    <span class="text-[10px] font-bold text-amber-800 uppercase">कार्ब्स</span>
                                     <p class="text-xl font-black text-amber-700 mt-0.5" id="res-tot-carb">११९</p>
                                     <span class="text-[10px] text-slate-500">ग्राम</span>
                                 </div>
-                                <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-                                    <span class="text-[10px] font-bold text-emerald-600 uppercase">चिल्लो</span>
-                                    <p class="text-xl font-black text-emerald-700 mt-0.5" id="res-tot-fat">९.५</p>
+                                <div class="p-3 rounded-xl bg-lime-50 border border-lime-200">
+                                    <span class="text-[10px] font-bold text-lime-800 uppercase">चिल्लो</span>
+                                    <p class="text-xl font-black text-lime-700 mt-0.5" id="res-tot-fat">९.५</p>
                                     <span class="text-[10px] text-slate-500">ग्राम</span>
                                 </div>
                             </div>
@@ -648,7 +914,7 @@
                                 <!-- Local Affordable Additions -->
                                 <div id="res-additions-container" class="mt-3 pt-3 border-t border-slate-200/60 text-xs">
                                     <strong class="text-slate-800 block mb-1">💡 सस्तो स्थानीय सुधारका उपायहरू:</strong>
-                                    <ul id="res-additions-list" class="space-y-1 list-disc list-inside text-emerald-700">
+                                    <ul id="res-additions-list" class="space-y-1 list-disc list-inside text-emerald-800">
                                         <!-- Populated by JS -->
                                     </ul>
                                 </div>
@@ -661,23 +927,23 @@
 
 
             <!-- ===================================================== -->
-            <!-- SECTION 3: POSHAN SAATHI CHATBOT (पोषण साथी AI)       -->
+            <!-- SECTION 5: POSHAN SAATHI CHATBOT (पोषण साथी AI)       -->
             <!-- ===================================================== -->
             <section id="view-chat" class="hidden space-y-4">
                 <!-- Chatbot Header -->
-                <div class="p-4 rounded-2xl bg-gradient-to-r from-red-600 to-orange-600 text-white flex items-center justify-between shadow-md">
+                <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-700 to-teal-800 text-white flex items-center justify-between shadow-md">
                     <div class="flex items-center gap-3">
                         <div class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white">
                             <i data-lucide="bot" class="w-6 h-6"></i>
                         </div>
                         <div>
                             <h3 class="font-bold text-base tracking-tight" id="chat-title">पोषण साथी (Poshan Saathi AI)</h3>
-                            <p class="text-xs text-red-100" id="chat-sub">नेपाली खाना र कुपोषण रोकथाम परामर्शदाता</p>
+                            <p class="text-xs text-emerald-100" id="chat-sub">नेपाली खाना र कुपोषण रोकथाम परामर्शदाता</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>सक्रिय (Online)</span>
+                        <span>सक्रिय (Online via Gemini AI)</span>
                     </div>
                 </div>
 
@@ -685,19 +951,19 @@
                 <div class="space-y-1.5">
                     <span class="text-xs font-bold text-slate-400 uppercase tracking-wider" id="chat-quick-label">छिटो सोध्नुहोस् (Quick Prompts):</span>
                     <div class="flex flex-wrap gap-2 text-xs">
-                        <button onclick="sendQuickChatMessage('मेरो BMR अनुसार यो खाना सन्तुलित छ कि छैन?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-red-400 text-slate-700 hover:text-red-600 transition shadow-sm">
+                        <button onclick="sendQuickChatMessage('मेरो BMR अनुसार यो खाना सन्तुलित छ कि छैन?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-700 transition shadow-sm">
                             🔥 BMR अनुसार खाना ठीक छ?
                         </button>
-                        <button onclick="sendQuickChatMessage('नेपालमा सस्तो र सुलभ रूपमा प्रोटिन कसरी बढाउने?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-red-400 text-slate-700 hover:text-red-600 transition shadow-sm">
+                        <button onclick="sendQuickChatMessage('नेपालमा सस्तो र सुलभ रूपमा प्रोटिन कसरी बढाउने?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-700 transition shadow-sm">
                             🥚 सस्तो प्रोटिन कसरी बढाउने?
                         </button>
-                        <button onclick="sendQuickChatMessage('कुपोषण र दुब्लोपन हटाउन परम्परागत नेपाली खाना के के हुन्?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-red-400 text-slate-700 hover:text-red-600 transition shadow-sm">
+                        <button onclick="sendQuickChatMessage('कुपोषण र दुब्लोपन हटाउन परम्परागत नेपाली खाना के के हुन्?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-700 transition shadow-sm">
                             🌱 कुपोषण र दुब्लोपन हटाउने
                         </button>
-                        <button onclick="sendQuickChatMessage('रक्तअल्पता वा रगतको कमी हुन नदिन के खाने?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-red-400 text-slate-700 hover:text-red-600 transition shadow-sm">
+                        <button onclick="sendQuickChatMessage('रक्तअल्पता वा रगतको कमी हुन नदिन के खाने?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-700 transition shadow-sm">
                             🩸 रगतको कमी (आइरन) बढाउन
                         </button>
-                        <button onclick="sendQuickChatMessage('के म:म: दैनिक खान मिल्छ? स्वास्थ्यका लागि कस्तो हुन्छ?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-red-400 text-slate-700 hover:text-red-600 transition shadow-sm">
+                        <button onclick="sendQuickChatMessage('के म:म: दैनिक खान मिल्छ? स्वास्थ्यका लागि कस्तो हुन्छ?')" class="px-3 py-1.5 rounded-full bg-white border border-slate-200 hover:border-emerald-500 text-slate-700 hover:text-emerald-700 transition shadow-sm">
                             🥟 म:म: कत्तिको स्वस्थकर हो?
                         </button>
                     </div>
@@ -707,7 +973,7 @@
                 <div id="chat-messages-container" class="glass-card p-4 sm:p-6 h-[460px] overflow-y-auto space-y-4">
                     <!-- Initial Welcome Message from Bot -->
                     <div class="flex items-start gap-3">
-                        <div class="w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center flex-shrink-0 font-bold text-sm">
+                        <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center flex-shrink-0 font-bold text-sm">
                             <i data-lucide="bot" class="w-4 h-4"></i>
                         </div>
                         <div class="chat-bubble-bot p-4 text-xs sm:text-sm max-w-[85%] space-y-2">
@@ -721,8 +987,8 @@
 
                 <!-- Chat Input Form -->
                 <form onsubmit="handleChatSubmit(event)" class="flex gap-2">
-                    <input type="text" id="chat-input-text" placeholder="पोषण सम्बन्धी कुनै पनि प्रश्न सोध्नुहोस्..." class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm">
-                    <button type="submit" class="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
+                    <input type="text" id="chat-input-text" placeholder="पोषण सम्बन्धी कुनै पनि प्रश्न सोध्नुहोस्..." class="flex-1 px-4 py-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm">
+                    <button type="submit" class="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition flex items-center gap-1.5">
                         <i data-lucide="send" class="w-4 h-4"></i>
                         <span class="hidden sm:inline">पठाउनुहोस्</span>
                     </button>
@@ -731,7 +997,7 @@
 
 
             <!-- ===================================================== -->
-            <!-- SECTION 4: NEPALI FOODS ENCYCLOPAEDIA                 -->
+            <!-- SECTION 6: NEPALI FOODS ENCYCLOPAEDIA                 -->
             <!-- ===================================================== -->
             <section id="view-explorer" class="hidden space-y-6">
                 <div class="border-b border-slate-200 pb-4">
@@ -745,10 +1011,10 @@
                 <div class="flex flex-col sm:flex-row gap-3">
                     <div class="relative flex-1">
                         <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
-                        <input type="text" id="foods-search-input" oninput="handleFoodSearch(event)" placeholder="खाना खोज्नुहोस् (उदा: ढिँडो, म:म:, Kwati, Bhatmas, Saag)..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 text-xs sm:text-sm font-medium">
+                        <input type="text" id="foods-search-input" oninput="handleFoodSearch(event)" placeholder="खाना खोज्नुहोस् (उदा: ढिँडो, म:म:, Kwati, Bhatmas, Saag)..." class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500 text-xs sm:text-sm font-medium">
                     </div>
                     <div class="flex gap-1.5 overflow-x-auto pb-1 sm:pb-0 text-xs font-semibold">
-                        <button onclick="filterFoodsCategory('all')" class="cat-pill active px-3 py-2 rounded-xl border border-slate-200 bg-red-600 text-white transition flex-shrink-0">सबै (All)</button>
+                        <button onclick="filterFoodsCategory('all')" class="cat-pill active px-3 py-2 rounded-xl border border-slate-200 bg-emerald-600 text-white transition flex-shrink-0">सबै (All)</button>
                         <button onclick="filterFoodsCategory('high_protein')" class="cat-pill px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition flex-shrink-0">उच्च प्रोटिन</button>
                         <button onclick="filterFoodsCategory('traditional_superfood')" class="cat-pill px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition flex-shrink-0">रैथाने सुपरफुड</button>
                         <button onclick="filterFoodsCategory('iron_rich')" class="cat-pill px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition flex-shrink-0">आइरनयुक्त</button>
@@ -766,9 +1032,9 @@
 
 
     <!-- ========================================================= -->
-    <!-- EDIT PROFILE MODAL (CALCULATE BMR/TDEE ANYTIME)           -->
+    <!-- MODAL 1: EDIT PROFILE MODAL (CALCULATE BMR/TDEE ANYTIME)  -->
     <!-- ========================================================= -->
-    <div id="modal-edit-profile" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-edit-profile" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-6 border border-slate-200 space-y-4">
             <div class="flex items-center justify-between pb-3 border-b border-slate-200">
                 <h3 class="font-bold text-base text-slate-900" id="modal-edit-title">शारीरिक विवरण सम्पादन</h3>
@@ -806,16 +1072,111 @@
                 </div>
                 <div class="pt-2 flex justify-end gap-2">
                     <button type="button" onclick="closeEditProfileModal()" class="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 font-bold">रद्द गर्नुहोस्</button>
-                    <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">अपडेट गर्नुहोस्</button>
+                    <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold">अपडेट गर्नुहोस्</button>
                 </div>
             </form>
         </div>
     </div>
 
+
+    <!-- ========================================================= -->
+    <!-- MODAL 2: MANUAL FOOD / CHEAT MEAL ADDITION MODAL          -->
+    <!-- ========================================================= -->
+    <div id="modal-manual-meal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="max-w-md w-full bg-white rounded-2xl shadow-2xl p-6 border border-slate-200 space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div class="flex items-center gap-2">
+                    <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                        <i data-lucide="utensils" class="w-4 h-4"></i>
+                    </div>
+                    <h3 class="font-bold text-base text-slate-900" id="modal-manual-title">म्यानुअल खाना / चिट मिल थप्नुहोस्</h3>
+                </div>
+                <button onclick="closeManualMealModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form onsubmit="handleManualMealSubmit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">द्रुत नेपाली परिकार रोज्नुहोस् (वा तल नाम लेख्नुहोस्):</label>
+                    <select id="manual-food-preset" onchange="handleManualFoodPresetSelect(event)" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        <option value="">-- रोज्नुहोस् वा आफ्नै लेख्नुहोस् --</option>
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">परिकारको नाम (Food Name)</label>
+                    <input type="text" id="manual-food-name" required placeholder="उदा: कुखुराको म:म:, समोसा, पिज्जा, चाउमिन..." class="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">छाक प्रकार (Meal Type)</label>
+                        <select id="manual-meal-type" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                            <option value="breakfast">बिहानी खाजा (Breakfast)</option>
+                            <option value="lunch">मुख्य खाना (Lunch)</option>
+                            <option value="snack" selected>दिउँसोको खाजा (Snack)</option>
+                            <option value="dinner">साँझको खाना (Dinner)</option>
+                            <option value="cheat">चिट मिल (Cheat Meal)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">मात्रा (Portion Description)</label>
+                        <input type="text" id="manual-portion-desc" placeholder="उदा: १० पिस / १ प्लेट / २ वटा" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">क्यालोरी (Calories kcal) *</label>
+                        <input type="number" id="manual-calories" min="10" max="4000" required value="450" class="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-emerald-700">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">प्रोटिन (Protein g)</label>
+                        <input type="number" id="manual-protein" step="0.5" min="0" max="200" value="18" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">कार्ब्स (Carbs g)</label>
+                        <input type="number" id="manual-carbs" step="0.5" min="0" max="300" value="50" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">चिल्लो (Fat g)</label>
+                        <input type="number" id="manual-fat" step="0.5" min="0" max="150" value="12" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                    </div>
+                </div>
+
+                <!-- Cheat Meal Checkbox -->
+                <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2">
+                    <input type="checkbox" id="manual-is-cheat" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                    <label for="manual-is-cheat" class="text-xs font-bold text-amber-900 cursor-pointer">
+                        🍕 यो चिट मिल हो (Mark as Cheat Meal)
+                    </label>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">कैफियत / टिपोट (Notes)</label>
+                    <input type="text" id="manual-notes" placeholder="उदा: साथीहरूसँग बाहिर खाएको, बिहेको भोज..." class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                </div>
+
+                <div class="pt-2 flex justify-end gap-2">
+                    <button type="button" onclick="closeManualMealModal()" class="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 font-bold">रद्द</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-md">
+                        इतिहासमा थप्नुहोस्
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     <!-- Frontend App Scripts -->
     <script src="/static/js/app.js"></script>
     <script>
-        // Initialize icons
+        // Initialize Lucide icons
         lucide.createIcons();
     </script>
 </body>
