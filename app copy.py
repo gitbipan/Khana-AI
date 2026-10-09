@@ -1,6 +1,7 @@
 """
-PoshanAI (पोषण AI) - Open-Source Nepali Nutrition & Malnutrition Advisory Platform
+KhanaAI (खाना AI) - Open-Source Nepali Nutrition & Malnutrition Advisory Platform
 Built for Hacktoberfest | Powered by Gemma & Open AI standards
+Team BubbleSort
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from core.advisor_engine import (
 
 # Page configuration
 st.set_page_config(
-    page_title="PoshanAI - पोषण AI",
+    page_title="KhanaAI - खाना AI",
     page_icon="🍲",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -163,7 +164,7 @@ with st.sidebar:
         "Google AI Studio / Gemma Key",
         value=os.getenv("GEMINI_API_KEY", ""),
         type="password",
-        help="Optional: PoshanAI works 100% offline with its built-in Nepali Food Knowledge Base if no key is entered!",
+        help="Optional: KhanaAI works 100% offline with its built-in Nepali Food Knowledge Base if no key is entered!",
     )
     if api_key_input:
         os.environ["GEMINI_API_KEY"] = api_key_input
@@ -185,7 +186,7 @@ with st.sidebar:
 
 # Header Banner
 header_title = (
-    "PoshanAI: पोषण AI" if lang == "ne" else "PoshanAI - Nepali Nutrition & Malnutrition Prevention"
+    "KhanaAI: खाना AI" if lang == "ne" else "KhanaAI - Nepali Nutrition & Malnutrition Prevention"
 )
 header_sub = (
     "नेपाली खानाको फोटोबाट क्यालोरी र पोषक तत्व पहिचान | BMR अनुसार व्यक्तिगत पोषण सल्लाह"
