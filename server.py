@@ -609,8 +609,9 @@ async def remove_history_log(log_id: int):
 
 
 @app.get("/api/history/weekly-tracker")
-async def get_weekly_tracker(user_id: str = "default", target_kcal: int = 2100):
+async def get_weekly_tracker(user_id: str = "default", target_kcal: float= 2100):
     """Weekly calorie intake vs budget tracker for homepage chart."""
+    target_kcal = int(round(target_kcal))
     # Ensure some history is seeded for guest demo if empty
     seed_demo_history_if_empty(user_id=user_id, target_kcal=target_kcal)
     stats = get_weekly_calorie_tracker(user_id=user_id, daily_target_kcal=target_kcal)
@@ -618,8 +619,10 @@ async def get_weekly_tracker(user_id: str = "default", target_kcal: int = 2100):
 
 
 @app.get("/api/history/doctor-report-data")
-async def get_doctor_report_data(user_id: str = "default", target_kcal: int = 2100):
+async def get_doctor_report_data(user_id: str = "default", target_kcal: float= 2100):
     """Compile 1-month comprehensive diet history and stats for physician report."""
+    target_kcal = int(round(target_kcal))
+    seed_demo_history_if_empty(user_id=user_id, target_kcal=target_kcal)
     logs = get_history(user_id=user_id, days=30)
     tracker = get_weekly_calorie_tracker(user_id=user_id, daily_target_kcal=target_kcal)
     return {
