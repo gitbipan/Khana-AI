@@ -1,6 +1,6 @@
-# Contributing to PoshanAI (पोषण AI) 🎃
+# Contributing to Khana-AI 🎃
 
-Thank you for your interest in contributing to **PoshanAI** during **Hacktoberfest 2026**!
+Thank you for your interest in contributing to **Khana-AI** during **Hacktoberfest 2026**!
 Our mission is to build an open-source, culturally tailored AI nutrition platform to address malnutrition and promote healthy eating across Nepal.
 
 ---
