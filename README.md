@@ -1,6 +1,6 @@
-# 🇳🇵 PoshanAI ( पोषण AI ) — Open-Source Nepali Nutrition
+# 🇳🇵 Khana-AI  — Open-Source Nepali Nutrition
 
-**PoshanAI** (formerly **Khana-AI**) is an open-source health and nutrition web platform tailored for traditional Nepali diets and South Asian health metrics. It calculates personalized calorie requirements from user profile data, evaluates meal nutritional balance, features a weekly meal planner, exports printable health reports for doctors, and includes a bilingual AI chatbot for diet queries.
+**KhanaAI** is an open-source health and nutrition web platform tailored for traditional Nepali diets and South Asian health metrics. It calculates personalized calorie requirements from user profile data, evaluates meal nutritional balance, features a weekly meal planner, exports printable health reports for doctors, and includes a bilingual AI chatbot for diet queries.
 
 ---
 
