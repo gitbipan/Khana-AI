@@ -11,6 +11,7 @@ const state = {
     selectedSampleFilename: 'dal_bhat_tarkari.jpg',
     currentMealAnalysis: null,
     currentDietPlan: null,
+    plannerCustomItems: [],
     dietHistory: [],
     historyFilterDays: 30,
     samplesList: [],
@@ -117,6 +118,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (savedUser) {
         try {
             state.user = JSON.parse(savedUser);
+            if (state.user && state.user.name) {
+                fetch(`/api/profile/get?username=${encodeURIComponent(state.user.name)}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.status === 'success' && d.profile) {
+                            state.user.profile = d.profile;
+                            state.user.assessment = d.assessment;
+                            localStorage.setItem('poshan_user', JSON.stringify(state.user));
+                            updateUserInterface();
+                        }
+                    }).catch(() => {});
+            }
             showAppScreen();
         } catch (e) {
             showLoginScreen();
@@ -127,6 +140,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await loadSamples();
     await loadFoods();
+    await loadPlannerCustomItems();
     populateManualFoodPresets();
     applyLanguage();
     lucide.createIcons();
@@ -144,6 +158,7 @@ function showAppScreen() {
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('app-screen').classList.remove('hidden');
     updateUserInterface();
+    loadPlannerCustomItems();
     switchNav('dashboard');
     lucide.createIcons();
 }
@@ -242,9 +257,13 @@ function switchNav(navId) {
     if (navId === 'dashboard') {
         renderWeeklyBudgetChart();
     } else if (navId === 'planner') {
-        if (!state.currentDietPlan) {
-            generateDietPlan();
-        }
+        loadPlannerCustomItems().then(() => {
+            if (!state.currentDietPlan) {
+                generateDietPlan();
+            } else {
+                renderDietPlan(state.currentDietPlan);
+            }
+        });
     } else if (navId === 'history') {
         loadDietHistory(state.historyFilterDays);
     }
@@ -299,7 +318,8 @@ function updateUserInterface() {
     document.getElementById('drawer-tdee-val').textContent = `${assessment.tdee_kcal} kcal`;
     document.getElementById('drawer-target-cal').textContent = `${assessment.target_daily.calories} kcal`;
     document.getElementById('drawer-target-pro').textContent = `${assessment.target_daily.protein_g} g`;
-    document.getElementById('drawer-water-val').textContent = `${assessment.water_liters} L`;
+    const waterEl = document.getElementById('drawer-water-val');
+    if (waterEl) waterEl.textContent = `${assessment.water_liters} L`;
 
     // Render dashboard weekly chart
     renderWeeklyBudgetChart();
@@ -384,15 +404,16 @@ async function renderWeeklyBudgetChart() {
 
         const labels = days.map(d => `${isNe ? d.day_ne : d.day_en} (${d.date.slice(5)})`);
         const consumedValues = days.map(d => d.calories);
-        const targetValues = days.map(d => stats.daily_target_kcal);
+        const lowerRangeValues = days.map(d => d.lower_target || Math.round(stats.daily_target_kcal * 0.90));
+        const upperRangeValues = days.map(d => d.upper_target || Math.round(stats.daily_target_kcal * 1.10));
 
-        // Bar colors depending on status:
-        // On target = emerald green, Undershot = sky blue, Overshot = warm orange
+        // Bar colors depending on range status:
+        // In Range = emerald green, Undershot (< lower range) = sky blue, Overshot (> upper range) = warm orange
         const barColors = days.map(d => {
             if (d.status === 'overshot') return '#ea580c'; // Warm orange
             if (d.status === 'undershot') return '#0284c7'; // Sky blue
             if (d.status === 'no_data') return '#cbd5e1'; // Slate gray
-            return '#16a34a'; // Emerald green (On target)
+            return '#16a34a'; // Emerald green (In Target Range)
         });
 
         if (state.charts.weeklyBudget) {
@@ -406,16 +427,30 @@ async function renderWeeklyBudgetChart() {
                 datasets: [
                     {
                         type: 'line',
-                        label: isNe ? 'दैनिक बजेट लक्ष्य (TDEE)' : 'Daily Budget Target',
-                        data: targetValues,
-                        borderColor: '#059669',
-                        borderWidth: 2,
-                        borderDash: [6, 4],
-                        pointRadius: 3,
-                        pointBackgroundColor: '#059669',
+                        label: isNe ? 'तल्लो सीमा (Undershoot Limit)' : 'Lower Limit (Undershoot)',
+                        data: lowerRangeValues,
+                        borderColor: '#0284c7',
+                        borderWidth: 1.5,
+                        borderDash: [5, 4],
+                        pointRadius: 2,
+                        pointBackgroundColor: '#0284c7',
                         fill: false,
                         tension: 0.1,
                         order: 1
+                    },
+                    {
+                        type: 'line',
+                        label: isNe ? 'माथिल्लो सीमा (Overshoot Limit)' : 'Upper Limit (Overshoot)',
+                        data: upperRangeValues,
+                        borderColor: '#ea580c',
+                        borderWidth: 1.5,
+                        borderDash: [5, 4],
+                        pointRadius: 2,
+                        pointBackgroundColor: '#ea580c',
+                        fill: '-1', // Fills area between Lower and Upper to show the Target Range band!
+                        backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                        tension: 0.1,
+                        order: 2
                     },
                     {
                         type: 'bar',
@@ -424,7 +459,7 @@ async function renderWeeklyBudgetChart() {
                         backgroundColor: barColors,
                         borderRadius: 8,
                         barThickness: 32,
-                        order: 2
+                        order: 3
                     }
                 ]
             },
@@ -453,13 +488,21 @@ async function renderWeeklyBudgetChart() {
                     tooltip: {
                         callbacks: {
                             afterLabel: (ctx) => {
-                                if (ctx.datasetIndex === 1) {
-                                    const day = days[ctx.dataIndex];
-                                    if (day.status === 'overshot') return ` ⚠️ बजेटभन्दा ${day.deviation} kcal बढी (Overshot)`;
-                                    if (day.status === 'undershot') return ` ℹ️ बजेटभन्दा ${Math.abs(day.deviation)} kcal कम (Undershot)`;
-                                    if (day.status === 'on_target') return ` ✅ पूर्ण सन्तुलित (On Target)`;
-                                }
-                                return '';
+                                if (ctx.dataset.type !== 'bar') return '';
+                                const day = days[ctx.dataIndex];
+                                const cal = day.calories;
+                                const upper = day.upper_target || Math.round(stats.daily_target_kcal * 1.10);
+                                const lower = day.lower_target || Math.round(stats.daily_target_kcal * 0.90);
+                                let statusMsg = isNe ? 'सन्तुलित (In Target Range)' : 'Balanced (In Range)';
+                                if (cal > upper) statusMsg = isNe ? `बढी (Overshoot: +${cal - upper} kcal)` : `Overshot (+${cal - upper} kcal)`;
+                                else if (cal < lower && cal > 0) statusMsg = isNe ? `कम (Undershoot: -${lower - cal} kcal)` : `Undershot (-${lower - cal} kcal)`;
+                                else if (cal === 0) statusMsg = isNe ? 'डाटा छैन (No Data)' : 'No Data';
+
+                                return [
+                                    `${isNe ? 'स्थिति' : 'Status'}: ${statusMsg}`,
+                                    `${isNe ? 'सन्तुलित दायरा' : 'Target Range'}: ${lower} - ${upper} kcal`,
+                                    `${isNe ? 'प्रोटिन' : 'Protein'}: ${day.protein_g}g (${day.meal_count} ${isNe ? 'छाक' : 'meals'})`
+                                ];
                             }
                         }
                     }
@@ -473,8 +516,22 @@ async function renderWeeklyBudgetChart() {
 }
 
 // =========================================================
-// FEATURE 1: AUTOMATIC NEPALI DIET PLANNER & CHECKLIST TODOS
+// FEATURE 1: AUTOMATIC NEPALI DIET PLANNER & INDIVIDUAL FOOD ITEM CHECKLISTS
 // =========================================================
+async function loadPlannerCustomItems() {
+    const userName = state.user ? state.user.name : 'default';
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+        const res = await fetch(`/api/planner/items?user_id=${encodeURIComponent(userName)}&date=${today}`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            state.plannerCustomItems = data.items || [];
+        }
+    } catch (e) {
+        console.warn('Could not load planner custom items:', e);
+    }
+}
+
 async function generateDietPlan() {
     const preference = document.getElementById('planner-preference-select') ? 
         document.getElementById('planner-preference-select').value : 'all';
@@ -482,6 +539,7 @@ async function generateDietPlan() {
     const profile = state.user ? state.user.profile : null;
 
     try {
+        await loadPlannerCustomItems();
         const res = await fetch('/api/planner/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -498,6 +556,7 @@ async function generateDietPlan() {
 }
 
 function renderDietPlan(plan) {
+    if (!plan) return;
     const container = document.getElementById('planner-meals-container');
     if (!container) return;
     const isNe = state.lang === 'ne';
@@ -515,8 +574,9 @@ function renderDietPlan(plan) {
         tipsContainer.innerHTML = tips.map(t => `<li>${t}</li>`).join('');
     }
 
-    // Saved checked state from localStorage for today
-    const checkedKey = `checked_meals_${new Date().toISOString().slice(0, 10)}`;
+    // Saved checked state for individual items from localStorage for today
+    const today = new Date().toISOString().slice(0, 10);
+    const checkedKey = `checked_food_items_${today}`;
     const savedChecked = JSON.parse(localStorage.getItem(checkedKey) || '{}');
 
     // Meal icon mappings
@@ -528,13 +588,15 @@ function renderDietPlan(plan) {
     };
 
     container.innerHTML = plan.meals.map(meal => {
-        const isChecked = !!savedChecked[meal.meal_type];
+        // Find custom entries for this meal type
+        const customItems = (state.plannerCustomItems || []).filter(c => c.meal_type === meal.meal_type);
+
         return `
-            <div class="glass-card p-5 space-y-4 border ${isChecked ? 'border-emerald-500 bg-emerald-50/20' : 'border-slate-200'}">
-                <!-- Meal Header & Checklist -->
+            <div class="glass-card p-5 space-y-4 border border-slate-200">
+                <!-- Meal Header -->
                 <div class="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-9 h-9 rounded-xl ${isChecked ? 'bg-emerald-600 text-white' : 'bg-emerald-100 text-emerald-700'} flex items-center justify-center font-bold">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
                             <i data-lucide="${icons[meal.meal_type] || 'utensils'}" class="w-5 h-5"></i>
                         </div>
                         <div>
@@ -545,15 +607,9 @@ function renderDietPlan(plan) {
                         </div>
                     </div>
 
-                    <!-- Checklist Todo Button -->
-                    <label class="flex items-center gap-1.5 cursor-pointer text-xs font-bold ${isChecked ? 'text-emerald-700 bg-emerald-100' : 'text-slate-600 bg-slate-100 hover:bg-slate-200'} px-3 py-1.5 rounded-lg transition select-none">
-                        <input type="checkbox" 
-                            id="check-${meal.meal_type}" 
-                            ${isChecked ? 'checked' : ''} 
-                            onchange="toggleMealChecklist('${meal.meal_type}')" 
-                            class="w-4 h-4 accent-emerald-600 rounded cursor-pointer">
-                        <span>${isChecked ? '✓ खाइसकें (Eaten)' : 'आज खाएँ? (Log)'}</span>
-                    </label>
+                    <span class="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
+                        ${isNe ? '✓ परिकार चेकलिस्ट' : '✓ Item Checklist'}
+                    </span>
                 </div>
 
                 <!-- Meal Calories & Macro Badges -->
@@ -576,21 +632,73 @@ function renderDietPlan(plan) {
                     </div>
                 </div>
 
-                <!-- Items Breakdown List -->
+                <!-- Individual Food Items Checklist (User can check or skip per item) -->
                 <div class="space-y-2 text-xs">
-                    ${meal.items.map(it => `
-                        <div class="flex items-start justify-between gap-2 p-2 rounded-lg bg-white border border-slate-100 hover:border-slate-200 transition">
-                            <div>
-                                <strong class="text-slate-800">${isNe ? it.name_ne : it.name_en}</strong>
-                                <span class="text-[11px] text-slate-500 block">${it.portion_desc} (${it.weight_g}g)</span>
-                                ${it.notes ? `<p class="text-[10px] text-emerald-700 mt-0.5">🌱 ${it.notes}</p>` : ''}
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
+                        ${isNe ? 'खाएका परिकार छनौट गर्नुहोस् (Check Eaten Items):' : 'Select items you ate:'}
+                    </p>
+                    ${meal.items.map((it, idx) => {
+                        const itemKey = `${meal.meal_type}_it_${idx}_${encodeURIComponent(it.name_ne)}`;
+                        const isChecked = !!savedChecked[itemKey];
+                        return `
+                            <div class="flex items-center justify-between gap-2.5 p-2.5 rounded-xl ${isChecked ? 'bg-emerald-50/70 border-emerald-300' : 'bg-white border-slate-100'} border hover:border-emerald-200 transition">
+                                <label class="flex items-center gap-2.5 cursor-pointer flex-1 select-none">
+                                    <input type="checkbox" 
+                                        id="${itemKey}" 
+                                        ${isChecked ? 'checked' : ''} 
+                                        onchange="toggleFoodItemCheck('${itemKey}', '${meal.meal_type}', '${it.name_ne.replace(/'/g, "\\'")}', '${it.portion_desc}', ${it.calories}, ${it.protein_g}, ${it.carbs_g}, ${it.fat_g})" 
+                                        class="w-4 h-4 accent-emerald-600 rounded cursor-pointer">
+                                    <div>
+                                        <strong class="text-xs ${isChecked ? 'line-through text-slate-400' : 'text-slate-800'}">
+                                            ${isNe ? it.name_ne : it.name_en}
+                                        </strong>
+                                        <span class="text-[11px] text-slate-500 block">${it.portion_desc} (${it.weight_g}g)</span>
+                                        ${it.notes ? `<p class="text-[10px] text-emerald-700 mt-0.5">🌱 ${it.notes}</p>` : ''}
+                                    </div>
+                                </label>
+                                <div class="text-right flex-shrink-0">
+                                    <span class="font-bold text-xs ${isChecked ? 'line-through text-slate-400' : 'text-slate-900'}">${it.calories} kcal</span>
+                                    <span class="text-[10px] text-slate-400 block">${it.protein_g}g pro</span>
+                                </div>
                             </div>
-                            <div class="text-right flex-shrink-0">
-                                <span class="font-bold text-slate-900">${it.calories} kcal</span>
-                                <span class="text-[10px] text-slate-400 block">${it.protein_g}g pro</span>
+                        `;
+                    }).join('')}
+
+                    <!-- Custom Entries in this meal section -->
+                    ${customItems.map(c => {
+                        const customKey = `custom_${c.id}`;
+                        const isCustomChecked = c.is_completed || !!savedChecked[customKey];
+                        return `
+                            <div class="flex items-center justify-between gap-2.5 p-2.5 rounded-xl ${isCustomChecked ? 'bg-amber-50/70 border-amber-300' : 'bg-amber-50/30 border-amber-200'} border transition">
+                                <label class="flex items-center gap-2.5 cursor-pointer flex-1 select-none">
+                                    <input type="checkbox" 
+                                        id="${customKey}" 
+                                        ${isCustomChecked ? 'checked' : ''} 
+                                        onchange="toggleFoodItemCheck('${customKey}', '${c.meal_type}', '${c.food_name.replace(/'/g, "\\'")}', '${c.portion_desc}', ${c.calories}, ${c.protein_g}, ${c.carbs_g}, ${c.fat_g}, ${c.id})" 
+                                        class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
+                                    <div>
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-200 text-amber-900">कस्टम एन्ट्री</span>
+                                            <strong class="text-xs ${isCustomChecked ? 'line-through text-slate-400' : 'text-slate-900'}">
+                                                ${c.food_name}
+                                            </strong>
+                                        </div>
+                                        <span class="text-[11px] text-slate-500 block">${c.portion_desc}</span>
+                                        ${c.notes ? `<p class="text-[10px] text-amber-800 mt-0.5">📝 ${c.notes}</p>` : ''}
+                                    </div>
+                                </label>
+                                <div class="flex items-center gap-2 flex-shrink-0">
+                                    <div class="text-right">
+                                        <span class="font-bold text-xs ${isCustomChecked ? 'line-through text-slate-400' : 'text-slate-900'}">${c.calories} kcal</span>
+                                        <span class="text-[10px] text-slate-400 block">${c.protein_g}g pro</span>
+                                    </div>
+                                    <button type="button" onclick="deleteCustomPlannerItem(${c.id})" class="p-1 text-slate-400 hover:text-red-600 rounded transition" title="हटाउनुहोस्">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </div>
             </div>
         `;
@@ -599,54 +707,85 @@ function renderDietPlan(plan) {
     lucide.createIcons();
 }
 
-async function toggleMealChecklist(mealType) {
-    if (!state.currentDietPlan) return;
-    const meal = state.currentDietPlan.meals.find(m => m.meal_type === mealType);
-    if (!meal) return;
-
-    const checkbox = document.getElementById(`check-${mealType}`);
-    const isChecked = checkbox ? checkbox.checked : false;
-
-    const checkedKey = `checked_meals_${new Date().toISOString().slice(0, 10)}`;
+async function toggleFoodItemCheck(itemKey, mealType, foodName, portionDesc, calories, protein, carbs, fat, customItemId = null) {
+    const today = new Date().toISOString().slice(0, 10);
+    const checkedKey = `checked_food_items_${today}`;
     const savedChecked = JSON.parse(localStorage.getItem(checkedKey) || '{}');
-    savedChecked[mealType] = isChecked;
+    const isNowChecked = !savedChecked[itemKey];
+    savedChecked[itemKey] = isNowChecked;
     localStorage.setItem(checkedKey, JSON.stringify(savedChecked));
 
-    if (isChecked) {
-        // Automatically add to Diet History!
-        const foodNames = meal.items.map(it => it.name_ne).join(' + ');
-        const payload = {
-            user_id: state.user ? state.user.name : 'default',
-            meal_type: mealType,
-            food_name: `${meal.title_ne}: ${foodNames}`,
-            portion_desc: '१ पूरा छाक (1 Full Planned Serving)',
-            calories: meal.total_calories,
-            protein_g: meal.total_protein_g,
-            carbs_g: meal.total_carbs_g,
-            fat_g: meal.total_fat_g,
-            is_cheat: false,
-            notes: 'योजना अनुसार खाएको भोजन (Logged via Diet Planner Checklist)'
-        };
-
+    if (customItemId) {
+        // Update custom item in database
         try {
-            await fetch('/api/history/log', {
+            await fetch('/api/planner/toggle-item', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    item_id: customItemId,
+                    is_completed: isNowChecked,
+                    user_id: state.user ? state.user.name : 'default',
+                    food_name: foodName,
+                    meal_type: mealType,
+                    portion_desc: portionDesc,
+                    calories: calories,
+                    protein_g: protein,
+                    carbs_g: carbs,
+                    fat_g: fat
+                })
             });
-            // Refresh weekly chart and history table
-            renderWeeklyBudgetChart();
-            renderDietPlan(state.currentDietPlan);
+            await loadPlannerCustomItems();
         } catch (e) {
-            console.error('Failed to log meal:', e);
+            console.error('Failed to toggle custom planner item:', e);
         }
     } else {
-        renderDietPlan(state.currentDietPlan);
+        // Individual planned food item checked: log to today's consumed total
+        if (isNowChecked && calories > 0) {
+            const payload = {
+                user_id: state.user ? state.user.name : 'default',
+                meal_type: mealType,
+                food_name: foodName,
+                portion_desc: portionDesc || '१ भाग',
+                calories: calories,
+                protein_g: protein || 0,
+                carbs_g: carbs || 0,
+                fat_g: fat || 0,
+                is_cheat: false,
+                notes: 'दैनिक तालिका चेकलिस्टबाट खाएको (Individual Item Checked)'
+            };
+            try {
+                await fetch('/api/history/log', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } catch (e) {
+                console.error('Failed to log individual item:', e);
+            }
+        }
+    }
+
+    // Refresh weekly budget chart on dashboard and update planner list
+    renderWeeklyBudgetChart();
+    renderDietPlan(state.currentDietPlan);
+}
+
+async function deleteCustomPlannerItem(itemId) {
+    if (!confirm('के तपाईं यो कस्टम परिकार दैनिक तालिकाबाट हटाउन चाहनुहुन्छ?')) return;
+    try {
+        const res = await fetch(`/api/planner/items/${itemId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            await loadPlannerCustomItems();
+            renderDietPlan(state.currentDietPlan);
+        }
+    } catch (e) {
+        console.error('Failed to delete custom planner item:', e);
     }
 }
 
 // =========================================================
-// FEATURE 2: MANUAL FOOD / CHEAT MEAL ADDITION
+// FEATURE 2: CUSTOM PLANNER ENTRY & NUTRITION ESTIMATION
 // =========================================================
 function populateManualFoodPresets() {
     const select = document.getElementById('manual-food-preset');
@@ -671,6 +810,39 @@ function handleManualFoodPresetSelect(event) {
     document.getElementById('manual-fat').value = opt.dataset.fat;
 }
 
+async function autoEstimateNutritionFromInput() {
+    const foodName = document.getElementById('manual-food-name').value.trim();
+    if (!foodName) return;
+    const portionDesc = document.getElementById('manual-portion-desc').value.trim();
+    const curCal = document.getElementById('manual-calories').value.trim();
+
+    try {
+        const res = await fetch('/api/foods/estimate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ food_name: foodName, portion_desc: portionDesc })
+        });
+        const data = await res.json();
+        if (data.status === 'success' && data.estimate) {
+            const est = data.estimate;
+            if (!curCal || parseFloat(curCal) === 0) {
+                document.getElementById('manual-calories').value = est.calories;
+                document.getElementById('manual-protein').value = est.protein_g;
+                document.getElementById('manual-carbs').value = est.carbs_g;
+                document.getElementById('manual-fat').value = est.fat_g;
+            }
+            const badge = document.getElementById('manual-estimate-badge');
+            const txt = document.getElementById('manual-estimate-text');
+            if (badge && txt) {
+                badge.classList.remove('hidden');
+                txt.textContent = `${est.source}: ~${est.calories} kcal, ${est.protein_g}g प्रोटिन`;
+            }
+        }
+    } catch (e) {
+        console.warn('Auto estimation note:', e);
+    }
+}
+
 function openManualMealModal() {
     document.getElementById('modal-manual-meal').classList.remove('hidden');
     populateManualFoodPresets();
@@ -682,21 +854,25 @@ function closeManualMealModal() {
 
 async function handleManualMealSubmit(event) {
     event.preventDefault();
+    const foodName = document.getElementById('manual-food-name').value.trim();
+    if (!foodName) return;
+
     const payload = {
         user_id: state.user ? state.user.name : 'default',
         meal_type: document.getElementById('manual-meal-type').value,
-        food_name: document.getElementById('manual-food-name').value.trim(),
+        food_name: foodName,
         portion_desc: document.getElementById('manual-portion-desc').value.trim() || '१ भाग',
         calories: parseFloat(document.getElementById('manual-calories').value) || 0,
         protein_g: parseFloat(document.getElementById('manual-protein').value) || 0,
         carbs_g: parseFloat(document.getElementById('manual-carbs').value) || 0,
         fat_g: parseFloat(document.getElementById('manual-fat').value) || 0,
-        is_cheat: document.getElementById('manual-is-cheat').checked,
-        notes: document.getElementById('manual-notes').value.trim() || ''
+        notes: document.getElementById('manual-notes').value.trim() || '',
+        date: new Date().toISOString().slice(0, 10)
     };
 
     try {
-        const res = await fetch('/api/history/log', {
+        // Directly adds to Daily Planner (not history tab!)
+        const res = await fetch('/api/planner/custom-entry', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -704,13 +880,24 @@ async function handleManualMealSubmit(event) {
         const data = await res.json();
         if (data.status === 'success') {
             closeManualMealModal();
-            // Refresh history and charts
-            loadDietHistory(state.historyFilterDays);
-            renderWeeklyBudgetChart();
-            alert('खाना इतिहासमा सफलतापूर्वक सुरक्षित भयो!');
+            // Reset form
+            document.getElementById('manual-food-name').value = '';
+            document.getElementById('manual-portion-desc').value = '';
+            document.getElementById('manual-calories').value = '';
+            document.getElementById('manual-protein').value = '';
+            document.getElementById('manual-carbs').value = '';
+            document.getElementById('manual-fat').value = '';
+            document.getElementById('manual-notes').value = '';
+            const b = document.getElementById('manual-estimate-badge');
+            if (b) b.classList.add('hidden');
+
+            // Refresh planner items and re-render
+            await loadPlannerCustomItems();
+            renderDietPlan(state.currentDietPlan);
+            alert('कस्टम परिकार दैनिक तालिकामा थपियो! (Added to Daily Planner)');
         }
     } catch (e) {
-        alert('खाना रेकर्ड गर्न असफल भयो।');
+        alert('कस्टम परिकार थप्न असफल भयो।');
     }
 }
 
@@ -786,7 +973,7 @@ function renderDietHistory(logs) {
         lunch: isNe ? 'मुख्य खाना' : 'Lunch',
         snack: isNe ? 'दिउँसो खाजा' : 'Snack',
         dinner: isNe ? 'साँझ खाना' : 'Dinner',
-        cheat: isNe ? 'चिट मिल 🍕' : 'Cheat Meal'
+        cheat: isNe ? 'कस्टम परिकार ✨' : 'Custom Entry'
     };
 
     tbody.innerHTML = logs.map(log => `
@@ -796,7 +983,7 @@ function renderDietHistory(logs) {
                 <span class="text-[10px] text-slate-400">${(log.timestamp || '').slice(11, 16)}</span>
             </td>
             <td class="py-3 px-4">
-                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${log.is_cheat ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${log.is_cheat ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
                     ${mealLabels[log.meal_type] || log.meal_type}
                 </span>
             </td>
@@ -809,7 +996,7 @@ function renderDietHistory(logs) {
             <td class="py-3 px-4 font-bold text-teal-700">${log.protein_g}g</td>
             <td class="py-3 px-4">
                 ${log.is_cheat ? 
-                    '<span class="text-[11px] font-bold text-orange-600">🚨 चिट मिल</span>' : 
+                    '<span class="text-[11px] font-bold text-amber-700">✨ कस्टम परिकार</span>' : 
                     '<span class="text-[11px] font-medium text-emerald-700">✓ नियमित</span>'}
             </td>
             <td class="py-3 px-4 text-right">
@@ -954,7 +1141,7 @@ async function downloadDoctorReportPDF() {
             ],
             [
                 `Average Protein Delivery: ${Math.round(totalPro / Math.max(1, logs.length / 3))} g/day`,
-                `Cheat Meals Logged: ${cheatCount} meals`,
+                `Custom Entries Logged: ${cheatCount} meals`,
                 `Budget Adherence Rate: ${stats.adherence_rate_pct || 85}%`
             ]
         ];
@@ -979,7 +1166,7 @@ async function downloadDoctorReportPDF() {
             l.food_name + (l.portion_desc ? ` (${l.portion_desc})` : ''),
             `${l.calories} kcal`,
             `${l.protein_g} g`,
-            l.is_cheat ? 'CHEAT' : 'NORMAL'
+            l.is_cheat ? 'CUSTOM' : 'NORMAL'
         ]);
 
         doc.autoTable({

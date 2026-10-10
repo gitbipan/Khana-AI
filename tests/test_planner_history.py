@@ -118,3 +118,95 @@ def test_planner_and_history_api_endpoints():
 
     # Cleanup
     client.delete(f"/api/history/{log_id}")
+
+
+def test_food_nutrition_auto_estimation():
+    # Test estimation with food name that matches database
+    res = client.post("/api/foods/estimate", json={"food_name": "म:म:", "portion_desc": "१० पिस"})
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["estimate"]["calories"] > 0
+    assert data["estimate"]["protein_g"] > 0
+
+    # Test estimation with common dish heuristics (e.g. samosa)
+    res2 = client.post("/api/foods/estimate", json={"food_name": "समोसा", "portion_desc": "२ वटा"})
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["status"] == "success"
+    assert data2["estimate"]["calories"] > 300  # 2 pieces multiplied
+
+
+def test_custom_planner_entry_and_checklist_flow():
+    # Add custom entry to planner without specifying calories (testing auto-estimate)
+    custom_payload = {
+        "user_id": "test_planner_user",
+        "meal_type": "snack",
+        "food_name": "चाउमिन (Chowmein)",
+        "portion_desc": "१ प्लेट",
+        "notes": "Custom evening snack"
+    }
+    res_entry = client.post("/api/planner/custom-entry", json=custom_payload)
+    assert res_entry.status_code == 200
+    entry_data = res_entry.json()
+    assert entry_data["status"] == "success"
+    assert entry_data["entry"]["calories"] > 0  # Auto-estimated!
+    item_id = entry_data["item_id"]
+
+    # Verify item is retrieved in planner
+    res_items = client.get("/api/planner/items?user_id=test_planner_user")
+    assert res_items.status_code == 200
+    items_data = res_items.json()
+    assert any(it["id"] == item_id for it in items_data["items"])
+
+    # Test toggling item checklist
+    res_toggle = client.post("/api/planner/toggle-item", json={
+        "item_id": item_id,
+        "is_completed": True,
+        "user_id": "test_planner_user",
+        "food_name": "चाउमिन (Chowmein)",
+        "meal_type": "snack",
+        "calories": entry_data["entry"]["calories"],
+        "protein_g": entry_data["entry"]["protein_g"]
+    })
+    assert res_toggle.status_code == 200
+    assert res_toggle.json()["is_completed"] is True
+
+    # Test weekly tracker target range properties
+    res_tracker = client.get("/api/history/weekly-tracker?user_id=test_planner_user&target_kcal=2200")
+    stats = res_tracker.json()["stats"]
+    assert stats["upper_target_kcal"] == round(2200 * 1.10)
+    assert stats["lower_target_kcal"] == round(2200 * 0.90)
+
+    # Cleanup planner item
+    client.delete(f"/api/planner/items/{item_id}")
+
+
+def test_central_database_profile_sync():
+    # Login and save user
+    login_payload = {
+        "name": "राम_बहादुर",
+        "age_years": 28,
+        "sex": "male",
+        "height_cm": 175.0,
+        "weight_kg": 68.0,
+        "activity_level": "moderate",
+        "goal": "maintain"
+    }
+    res_login = client.post("/api/auth/login", json=login_payload)
+    assert res_login.status_code == 200
+
+    # Retrieve from database
+    res_profile = client.get("/api/profile/get?username=राम_बहादुर")
+    assert res_profile.status_code == 200
+    prof_data = res_profile.json()
+    assert prof_data["status"] == "success"
+    assert prof_data["profile"]["height_cm"] == 175.0
+    assert prof_data["profile"]["weight_kg"] == 68.0
+
+    # List all users
+    res_users = client.get("/api/profile/users")
+    assert res_users.status_code == 200
+    users_list = res_users.json()["users"]
+    assert any(u["username"] == "राम_बहादुर" for u in users_list)
+

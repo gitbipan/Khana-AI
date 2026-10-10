@@ -240,3 +240,92 @@ def get_nutrition_db() -> NutritionDatabase:
     if _db_instance is None:
         _db_instance = NutritionDatabase()
     return _db_instance
+
+
+def estimate_food_nutrition(food_name: str, portion_desc: str = "") -> Dict[str, Any]:
+    """
+    Intelligently estimates calories and macros (protein, carbs, fat)
+    from food name and portion description.
+    Uses authentic Nepali food database first, then smart food heuristics.
+    """
+    db = get_nutrition_db()
+    name = (food_name or "").strip()
+    portion = (portion_desc or "").strip().lower()
+
+    # Multiplier based on portion words
+    mult = 1.0
+    if any(w in portion for w in ["२", "2", "two", "double", "ठूलो", "large"]):
+        mult = 1.8
+    elif any(w in portion for w in ["३", "3", "three"]):
+        mult = 2.5
+    elif any(w in portion for w in ["आधा", "half", "0.5", "सानो", "small"]):
+        mult = 0.6
+    elif any(w in portion for w in ["१०", "10"]):
+        mult = 1.0  # e.g. 10 pcs momo is standard 1 plate
+
+    # 1. Search in Nepali foods database
+    match = db.fuzzy_match(name)
+    if not match:
+        results = db.search(name)
+        if results:
+            match = results[0]
+
+    if match:
+        serv = match.per_serving
+        return {
+            "calories": round(serv.calories * mult, 1),
+            "protein_g": round(serv.protein_g * mult, 1),
+            "carbs_g": round(serv.carbs_g * mult, 1),
+            "fat_g": round(serv.fat_g * mult, 1),
+            "source": f"Database match: {match.name_ne} ({match.name_en})",
+            "matched_id": match.id,
+        }
+
+    # 2. Heuristics based on common dishes
+    n_lower = name.lower()
+    heuristics = [
+        (["momo", "मम", "म:म:"], 420.0, 22.0, 52.0, 12.0),
+        (["pizza", "पिज्जा"], 320.0, 13.0, 38.0, 12.0),
+        (["burger", "बर्गर"], 440.0, 19.0, 46.0, 18.0),
+        (["samosa", "समोसा", "सिङ्घाडा"], 260.0, 4.5, 30.0, 14.0),
+        (["chowmein", "चाउमिन", "chaumin", "noodles"], 380.0, 10.0, 56.0, 12.0),
+        (["thukpa", "थुक्पा"], 360.0, 16.0, 52.0, 9.0),
+        (["chiya", "चिया", "tea"], 95.0, 2.0, 15.0, 2.5),
+        (["coffee", "कफी"], 90.0, 2.0, 13.0, 2.5),
+        (["biscuit", "बिस्कुट", "cookie"], 130.0, 1.8, 22.0, 4.0),
+        (["anda", "अण्डा", "egg"], 140.0, 12.0, 1.0, 9.5),
+        (["roti", "रोटी", "chapati", "fulka"], 120.0, 3.5, 24.0, 1.2),
+        (["bhat", "भात", "rice", "chawal"], 240.0, 4.5, 52.0, 0.8),
+        (["dal", "दाल", "lentil"], 150.0, 9.0, 24.0, 1.5),
+        (["tarkari", "तरकारी", "curry"], 160.0, 3.5, 20.0, 7.5),
+        (["masu", "मासु", "meat", "chicken", "buff", "mutton"], 310.0, 28.0, 2.0, 20.0),
+        (["dhindo", "ढिँडो"], 340.0, 8.5, 72.0, 1.8),
+        (["kwati", "क्वाँटी"], 260.0, 15.5, 44.0, 2.5),
+        (["gundruk", "गुन्द्रुक"], 85.0, 5.0, 12.0, 1.5),
+        (["salad", "सलाद"], 70.0, 1.8, 12.0, 1.2),
+        (["fruit", "फलफूल", "apple", "banana", "स्याउ", "केरा"], 105.0, 1.2, 26.0, 0.4),
+        (["dahi", "दही", "curd", "yogurt"], 140.0, 6.0, 11.0, 6.5),
+        (["mohi", "मोही", "buttermilk"], 80.0, 4.0, 8.0, 3.0),
+    ]
+
+    for keywords, c, p, cr, f in heuristics:
+        if any(k in n_lower for k in keywords):
+            return {
+                "calories": round(c * mult, 1),
+                "protein_g": round(p * mult, 1),
+                "carbs_g": round(cr * mult, 1),
+                "fat_g": round(f * mult, 1),
+                "source": "Smart heuristic estimation",
+                "matched_id": None,
+            }
+
+    # Default general Nepali dish estimate (~300 kcal)
+    return {
+        "calories": round(300.0 * mult, 1),
+        "protein_g": round(8.0 * mult, 1),
+        "carbs_g": round(45.0 * mult, 1),
+        "fat_g": round(7.0 * mult, 1),
+        "source": "General dish estimation",
+        "matched_id": None,
+    }
+

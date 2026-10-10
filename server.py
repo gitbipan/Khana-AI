@@ -32,6 +32,7 @@ from core.nutrition_db import (
     MealItemPortion,
     MealSummary,
     FoodItem,
+    estimate_food_nutrition,
 )
 from core.vision_engine import analyze_food_image, VisionRecognitionResult
 from core.advisor_engine import (
@@ -47,6 +48,13 @@ from core.diet_history import (
     delete_log,
     get_weekly_calorie_tracker,
     seed_demo_history_if_empty,
+    add_planner_item,
+    get_planner_items,
+    set_planner_item_completion,
+    delete_planner_item,
+    save_or_update_user,
+    get_user_by_username,
+    list_all_users,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -109,6 +117,38 @@ class PlanGenerateRequest(BaseModel):
     preference: str = "all"  # "all", "veg", "budget"
 
 
+class CustomPlannerEntryRequest(BaseModel):
+    user_id: str = "default"
+    meal_type: str = "lunch"
+    food_name: str
+    portion_desc: str = "१ भाग"
+    weight_g: float = 100.0
+    calories: Optional[float] = None
+    protein_g: Optional[float] = None
+    carbs_g: Optional[float] = None
+    fat_g: Optional[float] = None
+    notes: str = ""
+    date: Optional[str] = None
+
+
+class TogglePlannerItemRequest(BaseModel):
+    item_id: int
+    is_completed: bool
+    user_id: str = "default"
+    food_name: str = ""
+    meal_type: str = "lunch"
+    portion_desc: str = ""
+    calories: float = 0.0
+    protein_g: float = 0.0
+    carbs_g: float = 0.0
+    fat_g: float = 0.0
+
+
+class FoodEstimateRequest(BaseModel):
+    food_name: str
+    portion_desc: str = ""
+
+
 class LogMealRequest(BaseModel):
     user_id: str = "default"
     meal_type: str = "lunch"
@@ -137,7 +177,7 @@ async def health_check() -> dict[str, str]:
 
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
-    """User onboarding & instant assessment computation."""
+    """User onboarding & instant assessment computation stored in centralized database."""
     profile = UserProfile(
         age_years=req.age_years,
         sex=req.sex,
@@ -147,6 +187,18 @@ async def login(req: LoginRequest):
         goal=req.goal,
     )
     assessment = assess_nutrition(profile)
+    # Store profile in central database (MySQL / SQLite) so it syncs across computers
+    save_or_update_user(
+        username=req.name,
+        name=req.name,
+        age_years=req.age_years,
+        sex=req.sex.value if hasattr(req.sex, "value") else str(req.sex),
+        height_cm=req.height_cm,
+        weight_kg=req.weight_kg,
+        activity_level=req.activity_level.value if hasattr(req.activity_level, "value") else str(req.activity_level),
+        goal=req.goal.value if hasattr(req.goal, "value") else str(req.goal),
+        assessment=assessment.model_dump(),
+    )
     # Seed sample weekly history if new so weekly chart displays immediate insights
     seed_demo_history_if_empty(user_id=req.name, target_kcal=int(assessment.tdee_kcal))
     return {
@@ -155,6 +207,132 @@ async def login(req: LoginRequest):
         "profile": profile.model_dump(),
         "assessment": assessment.model_dump(),
     }
+
+
+@app.get("/api/profile/get")
+async def get_profile(username: str):
+    """Retrieve profile from central database by username."""
+    user = get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User profile not found")
+    profile = UserProfile(
+        age_years=user["age_years"],
+        sex=user["sex"],
+        height_cm=user["height_cm"],
+        weight_kg=user["weight_kg"],
+        activity_level=user["activity_level"],
+        goal=user["goal"],
+    )
+    assessment = assess_nutrition(profile)
+    return {
+        "status": "success",
+        "user": user,
+        "profile": profile.model_dump(),
+        "assessment": assessment.model_dump(),
+    }
+
+
+@app.get("/api/profile/users")
+async def get_users_list():
+    """List all registered profiles in central database."""
+    users = list_all_users()
+    return {"status": "success", "count": len(users), "users": users}
+
+
+@app.post("/api/foods/estimate")
+async def estimate_food(req: FoodEstimateRequest):
+    """Estimate calories and macronutrients for food item."""
+    est = estimate_food_nutrition(req.food_name, req.portion_desc)
+    return {"status": "success", "estimate": est}
+
+
+@app.post("/api/planner/custom-entry")
+async def add_custom_planner_entry(req: CustomPlannerEntryRequest):
+    """Add a custom food entry directly into the Daily Planner."""
+    cal = req.calories
+    pro = req.protein_g
+    carb = req.carbs_g
+    fat = req.fat_g
+
+    # If calories not provided or <= 0, automatically estimate from food name!
+    if cal is None or cal <= 0:
+        est = estimate_food_nutrition(req.food_name, req.portion_desc)
+        cal = est["calories"]
+        if pro is None or pro <= 0:
+            pro = est["protein_g"]
+        if carb is None or carb <= 0:
+            carb = est["carbs_g"]
+        if fat is None or fat <= 0:
+            fat = est["fat_g"]
+
+    item_id = add_planner_item(
+        user_id=req.user_id,
+        meal_type=req.meal_type,
+        food_name=req.food_name,
+        portion_desc=req.portion_desc,
+        weight_g=req.weight_g,
+        calories=cal or 300.0,
+        protein_g=pro or 0.0,
+        carbs_g=carb or 0.0,
+        fat_g=fat or 0.0,
+        is_custom=True,
+        notes=req.notes,
+        plan_date=req.date,
+    )
+    return {
+        "status": "success",
+        "item_id": item_id,
+        "entry": {
+            "id": item_id,
+            "meal_type": req.meal_type,
+            "food_name": req.food_name,
+            "portion_desc": req.portion_desc,
+            "weight_g": req.weight_g,
+            "calories": cal or 300.0,
+            "protein_g": pro or 0.0,
+            "carbs_g": carb or 0.0,
+            "fat_g": fat or 0.0,
+            "is_completed": False,
+            "is_custom": True,
+            "notes": req.notes,
+        },
+        "message": "Custom entry added to daily planner.",
+    }
+
+
+@app.get("/api/planner/items")
+async def list_planner_items(user_id: str = "default", date: Optional[str] = None):
+    """Retrieve planner items for user and date."""
+    items = get_planner_items(user_id=user_id, plan_date=date)
+    return {"status": "success", "count": len(items), "items": items}
+
+
+@app.post("/api/planner/toggle-item")
+async def toggle_item(req: TogglePlannerItemRequest):
+    """Toggle individual food item completion in planner and log to consumed totals."""
+    set_planner_item_completion(req.item_id, req.is_completed)
+    if req.is_completed and req.calories > 0:
+        log_meal(
+            user_id=req.user_id,
+            meal_type=req.meal_type,
+            food_name=req.food_name or "Planned Food Item",
+            portion_desc=req.portion_desc or "1 serving",
+            calories=req.calories,
+            protein_g=req.protein_g,
+            carbs_g=req.carbs_g,
+            fat_g=req.fat_g,
+            is_cheat=False,
+            notes="Logged via Planner Food Checklist",
+        )
+    return {"status": "success", "item_id": req.item_id, "is_completed": req.is_completed}
+
+
+@app.delete("/api/planner/items/{item_id}")
+async def remove_planner_item(item_id: int):
+    """Delete a custom entry from daily planner."""
+    ok = delete_planner_item(item_id)
+    return {"status": "success" if ok else "failed", "deleted": ok}
+
 
 
 @app.post("/api/profile/calculate")

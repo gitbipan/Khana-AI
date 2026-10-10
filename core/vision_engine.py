@@ -189,8 +189,8 @@ def _call_live_vision_api(image: Image.Image, api_key: str) -> VisionRecognition
     image_bytes = buffer.getvalue()
 
     models_to_try = [m for m in FALLBACK_MODELS]
-    if "gemini-3.5-flash" not in models_to_try:
-        models_to_try.insert(0, "gemini-3.5-flash")
+    if "gemma-4-31b-it" not in models_to_try:
+        models_to_try.insert(0, "gemma-4-31b-it")
 
     last_error = None
     response = None

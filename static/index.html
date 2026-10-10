@@ -62,7 +62,7 @@
                         🌱 स्वस्थ जीवन
                     </span>
                     <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-700">
-                        🤖 Gemini Multimodal AI
+                        🤖 Gemma 4 31B AI
                     </span>
                     <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800">
                         🩺 WHO South Asian Standard
@@ -275,11 +275,6 @@
                         <span class="text-xs text-slate-600 font-medium">प्रोटिन लक्ष्य (Protein RDA)</span>
                         <span class="text-sm font-bold text-slate-900" id="drawer-target-pro">७६.८ g (१.२ g/kg)</span>
                     </div>
-
-                    <div class="p-3 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                        <span class="text-xs text-slate-600 font-medium">न्यूनतम पानी (Daily Water)</span>
-                        <span class="text-sm font-bold text-slate-900" id="drawer-water-val">२.२ L</span>
-                    </div>
                 </div>
 
                 <!-- Edit Profile Button -->
@@ -406,18 +401,18 @@
                                 </h3>
                             </div>
                             <p class="text-xs text-slate-600 mt-0.5" id="weekly-graph-sub">
-                                तपाईंको दैनिक क्यालोरी बजेट (TDEE) तुलनामा प्रत्येक दिनको वास्तविक खपत: बजेट मिलेको, कम (Undershot) वा बढी (Overshot)।
+                                दैनिक क्यालोरीको सन्तुलित दायरा (Target Range): दायराभन्दा माथि भए बढी (Overshoot) र दायराभन्दा तल भए कम (Undershoot)।
                             </p>
                         </div>
                         <div class="flex items-center gap-2 text-xs">
                             <span class="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200">
-                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> सन्तुलित (Target)
-                            </span>
-                            <span class="inline-flex items-center gap-1 font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">
-                                <span class="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block"></span> कम (Undershot)
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span> सन्तुलित दायरा (Target Range)
                             </span>
                             <span class="inline-flex items-center gap-1 font-semibold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-md border border-orange-200">
-                                <span class="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span> बढी (Overshot)
+                                <span class="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block"></span> माथि: बढी (Overshoot)
+                            </span>
+                            <span class="inline-flex items-center gap-1 font-semibold text-sky-700 bg-sky-50 px-2.5 py-1 rounded-md border border-sky-200">
+                                <span class="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block"></span> तल: कम (Undershoot)
                             </span>
                         </div>
                     </div>
@@ -573,13 +568,9 @@
                             <option value="veg">शाकाहारी (Vegetarian)</option>
                             <option value="budget">सस्तो रैथाने (Low-Cost Budget)</option>
                         </select>
-                        <button onclick="generateDietPlan()" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-sm border border-white/20">
-                            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-                            <span>नयाँ AI योजना</span>
-                        </button>
                         <button onclick="openManualMealModal()" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-900 text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                             <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-                            <span>म्यानुअल / चिट मिल थप्नुहोस्</span>
+                            <span id="btn-add-custom-entry-label">कस्टम खाना थप्नुहोस् (Add Custom Entry)</span>
                         </button>
                     </div>
                 </div>
@@ -943,7 +934,7 @@
                     </div>
                     <div class="flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-200 border border-emerald-400/30">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                        <span>सक्रिय (Online via Gemini AI)</span>
+                        <span>सक्रिय (Online via Gemma 4 31B AI)</span>
                     </div>
                 </div>
 
@@ -1089,7 +1080,7 @@
                     <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
                         <i data-lucide="utensils" class="w-4 h-4"></i>
                     </div>
-                    <h3 class="font-bold text-base text-slate-900" id="modal-manual-title">म्यानुअल खाना / चिट मिल थप्नुहोस्</h3>
+                    <h3 class="font-bold text-base text-slate-900" id="modal-manual-title">कस्टम खाना एन्ट्री (Add Custom Food Entry)</h3>
                 </div>
                 <button onclick="closeManualMealModal()" class="text-slate-400 hover:text-slate-600">
                     <i data-lucide="x" class="w-5 h-5"></i>
@@ -1106,66 +1097,68 @@
                 </div>
 
                 <div>
-                    <label class="font-bold text-slate-700 block mb-1">परिकारको नाम (Food Name)</label>
-                    <input type="text" id="manual-food-name" required placeholder="उदा: कुखुराको म:म:, समोसा, पिज्जा, चाउमिन..." class="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="font-bold text-slate-700">परिकारको नाम (Food Name) *</label>
+                        <button type="button" onclick="autoEstimateNutritionFromInput()" class="text-[11px] text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i> स्वतः पोषण अनुमान (Auto-Estimate)
+                        </button>
+                    </div>
+                    <input type="text" id="manual-food-name" required onblur="autoEstimateNutritionFromInput()" placeholder="उदा: कुखुराको म:म:, समोसा, पिज्जा, चाउमिन..." class="w-full px-3 py-2 rounded-lg border border-slate-300 font-medium">
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="font-bold text-slate-700 block mb-1">छाक प्रकार (Meal Type)</label>
+                        <label class="font-bold text-slate-700 block mb-1">छाक प्रकार (Meal Section)</label>
                         <select id="manual-meal-type" class="w-full px-3 py-2 rounded-lg border border-slate-300">
                             <option value="breakfast">बिहानी खाजा (Breakfast)</option>
                             <option value="lunch">मुख्य खाना (Lunch)</option>
                             <option value="snack" selected>दिउँसोको खाजा (Snack)</option>
                             <option value="dinner">साँझको खाना (Dinner)</option>
-                            <option value="cheat">चिट मिल (Cheat Meal)</option>
                         </select>
                     </div>
                     <div>
                         <label class="font-bold text-slate-700 block mb-1">मात्रा (Portion Description)</label>
-                        <input type="text" id="manual-portion-desc" placeholder="उदा: १० पिस / १ प्लेट / २ वटा" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        <input type="text" id="manual-portion-desc" onblur="autoEstimateNutritionFromInput()" placeholder="उदा: १० पिस / १ प्लेट / २ वटा" class="w-full px-3 py-2 rounded-lg border border-slate-300">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <div>
-                        <label class="font-bold text-slate-700 block mb-1">क्यालोरी (Calories kcal) *</label>
-                        <input type="number" id="manual-calories" min="10" max="4000" required value="450" class="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-emerald-700">
+                        <label class="font-bold text-slate-700 block mb-1">क्यालोरी (Calories kcal) <span class="text-slate-400 font-normal">(स्वतः अनुमान)</span></label>
+                        <input type="number" id="manual-calories" min="0" max="4000" placeholder="स्वतः अनुमान वा लेख्नुहोस्" class="w-full px-3 py-2 rounded-lg border border-slate-300 font-bold text-emerald-700">
                     </div>
                     <div>
                         <label class="font-bold text-slate-700 block mb-1">प्रोटिन (Protein g)</label>
-                        <input type="number" id="manual-protein" step="0.5" min="0" max="200" value="18" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        <input type="number" id="manual-protein" step="0.5" min="0" max="200" placeholder="स्वतः" class="w-full px-3 py-2 rounded-lg border border-slate-300">
                     </div>
                 </div>
 
                 <div class="grid grid-cols-2 gap-2">
                     <div>
                         <label class="font-bold text-slate-700 block mb-1">कार्ब्स (Carbs g)</label>
-                        <input type="number" id="manual-carbs" step="0.5" min="0" max="300" value="50" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        <input type="number" id="manual-carbs" step="0.5" min="0" max="300" placeholder="स्वतः" class="w-full px-3 py-2 rounded-lg border border-slate-300">
                     </div>
                     <div>
                         <label class="font-bold text-slate-700 block mb-1">चिल्लो (Fat g)</label>
-                        <input type="number" id="manual-fat" step="0.5" min="0" max="150" value="12" class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                        <input type="number" id="manual-fat" step="0.5" min="0" max="150" placeholder="स्वतः" class="w-full px-3 py-2 rounded-lg border border-slate-300">
                     </div>
                 </div>
 
-                <!-- Cheat Meal Checkbox -->
-                <div class="p-2.5 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-2">
-                    <input type="checkbox" id="manual-is-cheat" class="w-4 h-4 accent-amber-600 rounded cursor-pointer">
-                    <label for="manual-is-cheat" class="text-xs font-bold text-amber-900 cursor-pointer">
-                        🍕 यो चिट मिल हो (Mark as Cheat Meal)
-                    </label>
+                <div id="manual-estimate-badge" class="hidden p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-medium flex items-center gap-1.5">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-600"></i>
+                    <span id="manual-estimate-text">पोषण स्वतः अनुमान गरियो!</span>
                 </div>
 
                 <div>
                     <label class="font-bold text-slate-700 block mb-1">कैफियत / टिपोट (Notes)</label>
-                    <input type="text" id="manual-notes" placeholder="उदा: साथीहरूसँग बाहिर खाएको, बिहेको भोज..." class="w-full px-3 py-2 rounded-lg border border-slate-300">
+                    <input type="text" id="manual-notes" placeholder="उदा: आफ्नै इच्छाको खाना, विशेष परिकार..." class="w-full px-3 py-2 rounded-lg border border-slate-300">
                 </div>
 
                 <div class="pt-2 flex justify-end gap-2">
                     <button type="button" onclick="closeManualMealModal()" class="px-4 py-2 bg-slate-100 rounded-lg text-slate-700 font-bold">रद्द</button>
-                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-md">
-                        इतिहासमा थप्नुहोस्
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-md flex items-center gap-1.5">
+                        <i data-lucide="calendar-plus" class="w-4 h-4"></i>
+                        <span>तालिकामा थप्नुहोस् (Add to Planner)</span>
                     </button>
                 </div>
             </form>

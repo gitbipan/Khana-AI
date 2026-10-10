@@ -318,8 +318,8 @@ class PoshanChatbot:
         context_prompt += f"User Question: {user_message}\n"
 
         models_to_try = [m for m in FALLBACK_MODELS]
-        if "gemini-3.5-flash" not in models_to_try:
-            models_to_try.insert(0, "gemini-3.5-flash")
+        if "gemma-4-31b-it" not in models_to_try:
+            models_to_try.insert(0, "gemma-4-31b-it")
 
         for m_name in models_to_try:
             try:

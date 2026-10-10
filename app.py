@@ -357,7 +357,7 @@ with tab_profile:
 
     # Macro targets bar
     st.markdown("#### 🎯 सिफारिस गरिएको दैनिक पोषक तत्व विभाजन" if lang == "ne" else "#### 🎯 Target Daily Nutrient Allocation")
-    d_col1, d_col2, d_col3, d_col4, d_col5 = st.columns(5)
+    d_col1, d_col2, d_col3, d_col4 = st.columns(4)
     with d_col1:
         st.metric(
             label="प्रोटिन / Protein" if lang == "ne" else "Protein",
@@ -379,11 +379,7 @@ with tab_profile:
             label="आइरन / Iron (RDA)" if lang == "ne" else "Iron",
             value=f"{ass.target_daily.iron_mg} mg",
         )
-    with d_col5:
-        st.metric(
-            label="पानी / Water Minimum" if lang == "ne" else "Water Target",
-            value=f"{ass.target_daily.water_liters} L",
-        )
+
 
     # Clinical Notes Box
     notes = ass.clinical_notes_ne if lang == "ne" else ass.clinical_notes_en
