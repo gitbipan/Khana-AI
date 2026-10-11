@@ -4,6 +4,13 @@
 
 ---
 
+## 📸 Demo
+
+![Food Detection Demo](docs/assets/food_scanner_demo.png)
+*AI Food Scanner analyzing a plate of Chicken Momo to estimate portion sizes, calories, and macronutrient balance.*
+
+---
+
 ## ✨ Key Features
 
 - **📊 South Asian Health Metrics:** Calculates South Asian BMI, Basal Metabolic Rate (BMR), Total Daily Energy Expenditure (TDEE), and daily protein targets based on age, height, and weight.
