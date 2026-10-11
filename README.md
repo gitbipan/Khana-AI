@@ -9,6 +9,8 @@
 ![Food Detection Demo](docs/assets/food_scanner_demo.png)
 *AI Food Scanner analyzing a plate of Chicken Momo to estimate portion sizes, calories, and macronutrient balance.*
 
+🌐 **Live Web Application:** [https://khana-ai.onrender.com/](https://khana-ai.onrender.com/)
+
 ---
 
 ## ✨ Key Features
@@ -29,10 +31,11 @@
 ```text
 Khana-AI/
 ├── core/                  # BMR calculator, vision engine, and nutrition DB
-├── data/                  # Local datasets (nepali_foods.json, diet_history.db)
-├── src/poshan_ai/        # Core application modules
-├── static/                # Web assets and styles
-├── tests/                 # Unit testing suites
-├── app.py                 # Streamlit web frontend entry point
-├── server.py              # Backend API server
-└── requirements.txt       # Python dependencies
+├── data/                  # Local datasets (nepali_foods.json, diet_history.db)[cite: 3]
+├── docs/assets/           # Screenshots and demo media[cite: 3]
+├── src/poshan_ai/        # Core application modules[cite: 3]
+├── static/                # Web assets and styles[cite: 3]
+├── tests/                 # Unit testing suites[cite: 3]
+├── app.py                 # Streamlit web frontend entry point[cite: 3]
+├── server.py              # Backend API server[cite: 3]
+└── requirements.txt       # Python dependencies[cite: 3]
